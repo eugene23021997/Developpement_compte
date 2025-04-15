@@ -1,12 +1,13 @@
-// App.js
-import React, { useState, useEffect, useMemo } from "react";
-import "./styles.css";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { dataService } from "./services/dataService";
+import { rssFeedService } from "./services/rssFeedService";
+import MatrixTabContent from "./components/MatrixTabContent";
+import OpportunitiesTabContent from "./components/OpportunitiesTabContent";
+import LoadingSpinner from "./components/LoadingSpinner";
+import "./premium-styles-enhanced.css";
 
-// Composant principal
-const MatrixApp = () => {
+const App = () => {
   const [activeTab, setActiveTab] = useState("matrix");
-  const [expandedServiceLine, setExpandedServiceLine] = useState(null);
-  const [expandedOffer, setExpandedOffer] = useState(null);
   const [selectedOffer, setSelectedOffer] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [relevanceFilter, setRelevanceFilter] = useState(0);
@@ -15,608 +16,48 @@ const MatrixApp = () => {
   const [sortBy, setSortBy] = useState("date");
   const [sortOrder, setSortOrder] = useState("desc");
   const [isLoading, setIsLoading] = useState(true);
+  const [showSearch, setShowSearch] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [rssNews, setRssNews] = useState([]);
+  const [isLoadingRss, setIsLoadingRss] = useState(false);
+  const [rssRelevanceMatrix, setRssRelevanceMatrix] = useState([]);
+  const [showRssOnly, setShowRssOnly] = useState(false);
+  const [lastRssUpdate, setLastRssUpdate] = useState(null);
+  const searchInputRef = useRef(null);
 
-  // Données
-  const data = useMemo(
-    () => ({
-      // Principales offres de BearingPoint
-      bpOffers: {
-        "BE Capital": ["Capital M&A", "PMI & Carve out"],
-        "Customer & Growth": [
-          "Digital Strategy & Innovation",
-          "Customer Experience",
-          "Marketing Transformation",
-          "Sales Transformation & Pricing",
-          "eCommerce",
-          "Data & CRM",
-        ],
-        "Finance & Risk": [
-          "Finance Excellence",
-          "Future ERP",
-          "Performance Management",
-          "Risk Management",
-          "Compliance",
-          "CFO 4.0 Strategy",
-        ],
-        Operations: [
-          "Product Lifecycle Management",
-          "Manufacturing & Maintenance",
-          "Logistics Execution",
-          "Digital Twin Supply Chain",
-          "Demand Management & Planning",
-          "Sourcing & Procurement",
-        ],
-        "People & Strategy": [
-          "Talent Management & HR",
-          "Change Management",
-          "Real Estate & New Ways of Working",
-          "Business Strategy",
-          "Operational & Process Excellence",
-          "Program & Project Mgt",
-        ],
-        Technology: [
-          "Cloud & Sourcing",
-          "CIO Advisory",
-          "Business Applications",
-          "Data, Analytics and AI",
-          "Data Security & Privacy",
-        ],
-      },
+  // États pour les données calculées
+  const [opportunitiesByOffering, setOpportunitiesByOffering] = useState({});
+  const [offeringStats, setOfferingStats] = useState({});
+  const [serviceLineStats, setServiceLineStats] = useState({});
+  const [yearlyStats, setYearlyStats] = useState({});
+  const [offeringToServiceLine, setOfferingToServiceLine] = useState({});
+  const [expandedServiceLine, setExpandedServiceLine] = useState(null);
+  const [expandedOffer, setExpandedOffer] = useState(null);
 
-      // Structure complète des offres par ligne de service
-      completeServiceLines: {
-        "Customer & Growth": [
-          "Digital Strategy & Innovation",
-          "Customer Experience",
-          "Marketing Transformation",
-          "Sales Transformation & Pricing",
-          "eCommerce",
-          "Data & CRM",
-        ],
-        "Finance & Risk": [
-          "Finance Excellence",
-          "Future ERP",
-          "Performance Management",
-          "Risk Management",
-          "Compliance",
-          "CFO 4.0 Strategy",
-        ],
-        Operations: [
-          "Product Lifecycle Management",
-          "Manufacturing & Maintenance",
-          "Logistics Execution",
-          "Digital Twin Supply Chain",
-          "Demand Management & Planning",
-          "Sourcing & Procurement",
-        ],
-        "People & Strategy": [
-          "Talent Management & HR",
-          "Change Management",
-          "Real Estate & New Ways of Working",
-          "Business Strategy",
-          "Operational & Process Excellence",
-          "Program & Project Mgt",
-        ],
-        Technology: [
-          "Cloud & Sourcing",
-          "CIO Advisory",
-          "Business Applications",
-          "Data, Analytics and AI",
-          "Data Security & Privacy",
-        ],
-        "BE Capital": ["Capital M&A", "PMI & Carve out"],
-      },
+  // Récupération des données
+  const data = useMemo(() => dataService.getData(), []);
 
-      // Actualités de Schneider Electric
-      schneiderNews: [
-        {
-          date: "06 Avr. 2025",
-          title: "Fins de carrière à la carte chez Schneider Electric",
-          category: "RH, Social",
-          description:
-            "Accord sur le compte épargne temps permettant aux salariés à trois ans de la retraite de travailler moins.",
-        },
-        {
-          date: "25 Mars 2025",
-          title:
-            "Schneider Electric débloque 700M$ pour le développement de l'IA aux USA",
-          category: "Investissement, Technologie, IA",
-          description:
-            "Modernisation de sites existants pour répondre à la croissance de l'IA et la demande énergétique.",
-        },
-        {
-          date: "25 Févr. 2025",
-          title:
-            "Malmené en bourse, Schneider Electric rassurant pour les centres de données",
-          category: "Finance, Data Centers",
-          description:
-            "Chute en bourse suite à des rumeurs d'annulation de contrats avec Microsoft.",
-        },
-        {
-          date: "20 Févr. 2025",
-          title:
-            "Bénéfice record pour Schneider Electric, tiré par l'efficacité énergétique",
-          category: "Finance, Efficacité énergétique",
-          description:
-            "Forte demande pour les produits liés à l'efficacité énergétique, notamment dans le segment des datacenters.",
-        },
-        {
-          date: "11 Janv. 2025",
-          title:
-            "Olivier Blum est le nouveau directeur général de Schneider Electric",
-          category: "Direction, Gouvernance",
-          description:
-            "Remplacement de Peter Herweck pour cause de désaccords.",
-        },
-        {
-          date: "04 Déc. 2024",
-          title:
-            "Schneider Electric et Nvidia développent de nouveaux systèmes de refroidissement",
-          category: "Partenariat, Data Centers, IA",
-          description:
-            "Collaboration pour des systèmes de refroidissement pour centres de données d'IA générative.",
-        },
-        {
-          date: "05 Nov. 2024",
-          title: "Schneider Electric victime d'une nouvelle fuite de données",
-          category: "Cybersécurité, Sécurité",
-          description:
-            "Plateforme de développement piratée, attaque par ransomware ayant entraîné le vol de données.",
-        },
-        {
-          date: "30 Oct. 2024",
-          title:
-            "470M€ d'amendes pour des ententes dans la distribution de matériel électrique",
-          category: "Juridique, Conformité",
-          description:
-            "Amende avec Legrand, Rexel et Sonepar pour ententes sur les prix.",
-        },
-        {
-          date: "17 Oct. 2024",
-          title: "Schneider Electric acquiert Motivair pour 850M$",
-          category: "Acquisition, Data Centers",
-          description:
-            "Renforcement sur le segment du refroidissement par fluides dans les data centers.",
-        },
-        {
-          date: "17 Sept. 2024",
-          title:
-            "Schneider Electric entre dans l'économie circulaire des appareils électriques",
-          category: "Développement durable, Économie circulaire",
-          description:
-            "Réparation et maintenance d'équipements électriques dans des usines à Grenoble.",
-        },
-      ],
+  // Détecter le scroll pour changer le style de la navbar
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 10) {
+        setScrolled(true);
+      } else {
+        setScrolled(false);
+      }
+    };
 
-      // Matrice de pertinence précalculée
-      relevanceMatrix: [
-        {
-          news: "Malmené en bourse, Schneider Electric rassurant pour les centres de données",
-          newsDate: "25 Févr. 2025",
-          newsCategory: "Finance, Data Centers",
-          offerCategory: "Finance & Risk",
-          relevanceScore: 3,
-          offerDetail: "Performance Management, Risk Management",
-        },
-        {
-          news: "Schneider Electric victime d'une nouvelle fuite de données",
-          newsDate: "05 Nov. 2024",
-          newsCategory: "Cybersécurité, Sécurité",
-          offerCategory: "Technology",
-          relevanceScore: 3,
-          offerDetail: "Data Security & Privacy",
-        },
-        {
-          news: "470M€ d'amendes pour des ententes dans la distribution de matériel électrique",
-          newsDate: "30 Oct. 2024",
-          newsCategory: "Juridique, Conformité",
-          offerCategory: "Finance & Risk",
-          relevanceScore: 3,
-          offerDetail: "Compliance",
-        },
-        {
-          news: "Schneider Electric acquiert Motivair pour 850M$",
-          newsDate: "17 Oct. 2024",
-          newsCategory: "Acquisition, Data Centers",
-          offerCategory: "BE Capital",
-          relevanceScore: 3,
-          offerDetail: "Capital M&A, PMI & Carve out",
-        },
-        {
-          news: "Fins de carrière à la carte chez Schneider Electric",
-          newsDate: "06 Avr. 2025",
-          newsCategory: "RH, Social",
-          offerCategory: "People & Strategy",
-          relevanceScore: 2,
-          offerDetail: "Talent Management & HR",
-        },
-        {
-          news: "Schneider Electric débloque 700M$ pour le développement de l'IA aux USA",
-          newsDate: "25 Mars 2025",
-          newsCategory: "Investissement, Technologie, IA",
-          offerCategory: "Technology",
-          relevanceScore: 2,
-          offerDetail: "Data, Analytics and AI",
-        },
-        {
-          news: "Bénéfice record pour Schneider Electric, tiré par l'efficacité énergétique",
-          newsDate: "20 Févr. 2025",
-          newsCategory: "Finance, Efficacité énergétique",
-          offerCategory: "Finance & Risk",
-          relevanceScore: 2,
-          offerDetail: "Finance Excellence, Performance Management",
-        },
-        {
-          news: "Olivier Blum est le nouveau directeur général de Schneider Electric",
-          newsDate: "11 Janv. 2025",
-          newsCategory: "Direction, Gouvernance",
-          offerCategory: "People & Strategy",
-          relevanceScore: 2,
-          offerDetail: "Change Management",
-        },
-        {
-          news: "Schneider Electric et Nvidia développent de nouveaux systèmes de refroidissement",
-          newsDate: "04 Déc. 2024",
-          newsCategory: "Partenariat, Data Centers, IA",
-          offerCategory: "Technology",
-          relevanceScore: 2,
-          offerDetail: "Data, Analytics and AI",
-        },
-        {
-          news: "Schneider Electric entre dans l'économie circulaire des appareils électriques",
-          newsDate: "17 Sept. 2024",
-          newsCategory: "Développement durable, Économie circulaire",
-          offerCategory: "Operations",
-          relevanceScore: 2,
-          offerDetail: "Manufacturing & Maintenance",
-        },
-        {
-          news: "Schneider Electric entre dans l'économie circulaire des appareils électriques",
-          newsDate: "17 Sept. 2024",
-          newsCategory: "Développement durable, Économie circulaire",
-          offerCategory: "People & Strategy",
-          relevanceScore: 1,
-          offerDetail: "Business Strategy",
-        },
-      ],
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
-      // Opportunités (version condensée, à compléter avec les données complètes)
-      rawOpportunities: [
-        {
-          id: "173406",
-          name: "PQL framework",
-          status: "14 - Booked",
-          closeDate: "24/10/2024",
-          estimatedValue: 30000,
-          grossRevenue: 30000,
-          serviceLine: "People & Strategy",
-          accountManager: "Francois Rovere",
-          cm1: "62,78",
-          comment:
-            "Analyser le système actuel de gestion qualité des projets et proposer une nouvelle mouture sur la base de benchmarks",
-          serviceOffering: "Operational & Process Excellence",
-        },
-        {
-          id: "163646",
-          name: "Data Excellence Enablement SellOn Dec. 2023",
-          status: "14 - Booked",
-          closeDate: "21/02/2024",
-          estimatedValue: 11000,
-          grossRevenue: 11000,
-          serviceLine: "Technology",
-          accountManager: "Marsida Lekaj",
-          cm1: "69,76",
-          comment: "Data Excellence support for 2023",
-          serviceOffering: "Data, Analytics and AI",
-        },
-        {
-          id: "163656",
-          name: "Data Excellence Enablement 2024",
-          status: "15 - Lost",
-          closeDate: "01/01/2024",
-          estimatedValue: 130000,
-          grossRevenue: 150000,
-          serviceLine: "Technology",
-          accountManager: "Marsida Lekaj",
-          cm1: "",
-          comment: "Data Excellence support for 2023",
-          serviceOffering: "Data, Analytics and AI",
-        },
-        {
-          id: "152390",
-          name: "Data Excellence Enablement 2023",
-          status: "14 - Booked",
-          closeDate: "07/02/2023",
-          estimatedValue: 180560,
-          grossRevenue: 261360,
-          serviceLine: "Technology",
-          accountManager: "Saskia Vercruyssen",
-          cm1: "75,7",
-          comment: "Data Excellence support for 2023",
-          serviceOffering: "Data, Analytics and AI",
-        },
-        {
-          id: "152607",
-          name: "Green Premium Reboot",
-          status: "15 - Lost",
-          closeDate: "06/01/2023",
-          estimatedValue: 108800,
-          grossRevenue: 128000,
-          serviceLine: "People & Strategy",
-          accountManager: "Florent Duval",
-          cm1: "",
-          comment: "Reboot of green premium sustainable offer",
-          serviceOffering: "Business Strategy",
-        },
-        {
-          id: "152341",
-          name: "Configurator study - extension Phase 2",
-          status: "14 - Booked",
-          closeDate: "25/11/2022",
-          estimatedValue: 57740,
-          grossRevenue: 57740,
-          serviceLine: "Customer & Growth",
-          accountManager: "Catherine Bouev",
-          cm1: "63,94",
-          comment: "sellon on the configurator study",
-          serviceOffering: "Sales Transformation & Pricing",
-        },
-        {
-          id: "151732",
-          name: "Typology Governance Study",
-          status: "15 - Lost",
-          closeDate: "16/11/2022",
-          estimatedValue: 190000,
-          grossRevenue: 190000,
-          serviceLine: "Customer & Growth",
-          accountManager: "Guillaume Billoir",
-          cm1: "",
-          comment: "RFP to launch study on data governance typology",
-          serviceOffering: "Sales Transformation & Pricing",
-        },
-        {
-          id: "151274",
-          name: "Data Excellence Enablement - 2022 Sell on 2",
-          status: "14 - Booked",
-          closeDate: "22/11/2022",
-          estimatedValue: 56750,
-          grossRevenue: 77000,
-          serviceLine: "Technology",
-          accountManager: "Saskia Vercruyssen",
-          cm1: "71,22",
-          comment:
-            "A deliverable based team associated to the completion of the Data Excellende for 2022",
-          serviceOffering: "Data, Analytics and AI",
-        },
-        {
-          id: "151074",
-          name: "Configurators study extension",
-          status: "14 - Booked",
-          closeDate: "31/10/2022",
-          estimatedValue: 57320,
-          grossRevenue: 57320,
-          serviceLine: "Customer & Growth",
-          accountManager: "Catherine Bouev",
-          cm1: "63,19",
-          comment: "Configurators study extension",
-          serviceOffering: "Sales Transformation & Pricing",
-        },
-        {
-          id: "149544",
-          name: "Customer Workspace MVP extension",
-          status: "14 - Booked",
-          closeDate: "14/09/2022",
-          estimatedValue: 17204,
-          grossRevenue: 17204,
-          serviceLine: "Customer & Growth",
-          accountManager: "Catherine Bouev",
-          cm1: "63,99",
-          comment: "Customer Workspace",
-          serviceOffering: "Sales Transformation & Pricing",
-        },
-        {
-          id: "146065",
-          name: "Configurators study",
-          status: "14 - Booked",
-          closeDate: "27/04/2022",
-          estimatedValue: 263000,
-          grossRevenue: 263000,
-          serviceLine: "Customer & Growth",
-          accountManager: "Catherine Bouev",
-          cm1: "63,19",
-          comment: "Configurators study",
-          serviceOffering: "Sales Transformation & Pricing",
-        },
-        {
-          id: "145653",
-          name: "Data Excellence Enablement - 2022 Sell on",
-          status: "14 - Booked",
-          closeDate: "30/04/2022",
-          estimatedValue: 165625,
-          grossRevenue: 221575,
-          serviceLine: "Technology",
-          accountManager: "Manu Timmermans",
-          cm1: "67,86",
-          comment:
-            "A deliverable-based surge team associated to the completion of the Data Excellence for the 2022 priority Franchisees.",
-          serviceOffering: "Data, Analytics and AI",
-        },
-        {
-          id: "137552",
-          name: "Data Excellence Enablement",
-          status: "14 - Booked",
-          closeDate: "30/04/2021",
-          estimatedValue: 109550,
-          grossRevenue: 190000,
-          serviceLine: "Technology",
-          accountManager: "Laurent Fayet",
-          cm1: "68,99",
-          comment:
-            "A deliverable-based surge team associated to the completion of the Data Excellence for the 2021 priority Franchisees.",
-          serviceOffering: "Data, Analytics and AI",
-        },
-        {
-          id: "134404",
-          name: "Sales Life simplification assistance",
-          status: "14 - Booked",
-          closeDate: "31/12/2020",
-          estimatedValue: 177650,
-          grossRevenue: 177650,
-          serviceLine: "Customer & Growth",
-          accountManager: "Olivier Faulque",
-          cm1: "61,21",
-          comment: "",
-          serviceOffering: "Digital Strategy & Innovation",
-        },
-        {
-          id: "125131",
-          name: "ORLM-phase 7( 2020)",
-          status: "14 - Booked",
-          closeDate: "31/12/2019",
-          estimatedValue: 619520,
-          grossRevenue: 625000,
-          serviceLine: "People & Strategy",
-          accountManager: "Guillaume Billoir",
-          cm1: "63,01",
-          comment:
-            "Suite mission de Guillaume Billoir avec Francois Martin Festa",
-          serviceOffering: "Sales Transformation & Pricing",
-        },
-        {
-          id: "122721",
-          name: "ORLM- phase 6 - Digital lock",
-          status: "14 - Booked",
-          closeDate: "30/09/2019",
-          estimatedValue: 252110,
-          grossRevenue: 253500,
-          serviceLine: "People & Strategy",
-          accountManager: "Guillaume Billoir",
-          cm1: "59,29",
-          comment:
-            "Suite du job ORLM à partir du 8 juillet jusqu'au 20 dec 2019 avec Guillaume Billoir",
-          serviceOffering: "Sales Transformation & Pricing",
-        },
-        {
-          id: "122334",
-          name: "DDG Event Platform Implementation Support",
-          status: "15 - Lost",
-          closeDate: "22/01/2019",
-          estimatedValue: 66000,
-          grossRevenue: 66000,
-          serviceLine: "People & Strategy",
-          accountManager: "Marjolein Biermans",
-          cm1: "",
-          comment: "Implémentation d'une plateforme d'événements marketing",
-          serviceOffering: "Marketing Transformation",
-        },
-        {
-          id: "121975",
-          name: "eCommerce RFI support",
-          status: "14 - Booked",
-          closeDate: "25/10/2019",
-          estimatedValue: 63504,
-          grossRevenue: 63504,
-          serviceLine: "People & Strategy",
-          accountManager: "Marjolein Biermans",
-          cm1: "63,1",
-          comment: "",
-          serviceOffering: "Customer Experience",
-        },
-        {
-          id: "121334",
-          name: "ORLM Phase 5",
-          status: "14 - Booked",
-          closeDate: "30/06/2019",
-          estimatedValue: 80740,
-          grossRevenue: 81400,
-          serviceLine: "People & Strategy",
-          accountManager: "Guillaume Billoir",
-          cm1: "60,40",
-          comment: "",
-          serviceOffering: "Sales Transformation & Pricing",
-        },
-        {
-          id: "119945",
-          name: "Sell-on 9 : Solar – extension Q1/19",
-          status: "14 - Booked",
-          closeDate: "30/04/2019",
-          estimatedValue: 85031,
-          grossRevenue: 85031,
-          serviceLine: "Finance & Risk",
-          accountManager: "Valerie Guichard-Douche",
-          cm1: "64,00",
-          comment: "",
-          serviceOffering: "CFO 4.0 Strategy",
-        },
-        {
-          id: "118222",
-          name: "Experience Client Digitale",
-          status: "15 - Lost",
-          closeDate: "13/03/2019",
-          estimatedValue: 100000,
-          grossRevenue: 100000,
-          serviceLine: "People & Strategy",
-          accountManager: "Patrice Begoc",
-          cm1: "",
-          comment: "",
-          serviceOffering: "Customer Experience",
-        },
-        {
-          id: "118152",
-          name: "Sell-on 8 : Solar – extension Q1/19",
-          status: "14 - Booked",
-          closeDate: "28/02/2019",
-          estimatedValue: 303416,
-          grossRevenue: 432373,
-          serviceLine: "Finance & Risk",
-          accountManager: "Valerie Guichard-Douche",
-          cm1: "64,40",
-          comment: "",
-          serviceOffering: "CFO 4.0 Strategy",
-        },
-        {
-          id: "116271",
-          name: "MA Offer launch customer journey mapping",
-          status: "15 - Lost",
-          closeDate: "01/02/2018",
-          estimatedValue: 50000,
-          grossRevenue: 50000,
-          serviceLine: "People & Strategy",
-          accountManager: "Marjolein Biermans",
-          cm1: "",
-          comment: "Cartographie du parcours client pour lancement d'offre MA",
-          serviceOffering: "Marketing Transformation",
-        },
-        {
-          id: "116035",
-          name: "Active Manager for Contact Centers",
-          status: "15 - Lost",
-          closeDate: "05/09/2019",
-          estimatedValue: 150000,
-          grossRevenue: 150000,
-          serviceLine: "People & Strategy",
-          accountManager: "Patrice Begoc",
-          cm1: "",
-          comment: "",
-          serviceOffering: "Service Transformation",
-        },
-        {
-          id: "115859",
-          name: "SE DCX-GDPR readiness support",
-          status: "15 - Lost",
-          closeDate: "04/09/2019",
-          estimatedValue: 150000,
-          grossRevenue: 150000,
-          serviceLine: "Finance & Risk",
-          accountManager: "Philippe Mannent",
-          cm1: "",
-          comment: "",
-          serviceOffering: "Compliance",
-        },
-      ],
-    }),
-    []
-  );
+  // Focus sur le champ de recherche lorsqu'il est affiché
+  useEffect(() => {
+    if (showSearch && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [showSearch]);
 
   // Fonction auxiliaire pour extraire l'année d'une date au format "DD/MM/YYYY"
   const extractYear = (dateStr) => {
@@ -627,13 +68,6 @@ const MatrixApp = () => {
     }
     return null;
   };
-
-  // État dérivé - Mapper les opportunités par offre de service
-  const [opportunitiesByOffering, setOpportunitiesByOffering] = useState({});
-  const [offeringStats, setOfferingStats] = useState({});
-  const [serviceLineStats, setServiceLineStats] = useState({});
-  const [yearlyStats, setYearlyStats] = useState({});
-  const [offeringToServiceLine, setOfferingToServiceLine] = useState({});
 
   // Initialisation des données dérivées
   useEffect(() => {
@@ -782,22 +216,68 @@ const MatrixApp = () => {
 
     setOffersWithNewsButNoOpp(offersMissingOpps);
     setIsLoading(false);
+
+    // Charger le flux RSS au démarrage
+    fetchRssNews();
   }, [data]);
+
+  // Récupération des actualités RSS
+  const fetchRssNews = async () => {
+    setIsLoadingRss(true);
+    try {
+      // Récupérer les actualités RSS
+      const news = await rssFeedService.getAllNews();
+      setRssNews(news);
+
+      // Analyser la pertinence des actualités par rapport aux offres
+      const relevanceMatrix = rssFeedService.analyzeNewsRelevance(
+        news,
+        data.completeServiceLines
+      );
+      setRssRelevanceMatrix(relevanceMatrix);
+
+      // Mettre à jour la date de dernière mise à jour
+      setLastRssUpdate(new Date());
+    } catch (error) {
+      console.error(
+        "Erreur lors de la récupération des actualités RSS:",
+        error
+      );
+    } finally {
+      setIsLoadingRss(false);
+    }
+  };
+
+  // Fusionner la matrice de pertinence des actualités stockées avec celles du flux RSS
+  const combinedRelevanceMatrix = useMemo(() => {
+    if (showRssOnly) {
+      return rssRelevanceMatrix;
+    } else {
+      return [...data.relevanceMatrix, ...rssRelevanceMatrix];
+    }
+  }, [data.relevanceMatrix, rssRelevanceMatrix, showRssOnly]);
 
   // Filtrer la matrice par offre, terme de recherche et score de pertinence
   const filteredMatrix = useMemo(() => {
-    return data.relevanceMatrix.filter((item) => {
+    return combinedRelevanceMatrix.filter((item) => {
       const matchesOffer =
         selectedOffer === "all" || item.offerCategory === selectedOffer;
       const matchesSearch =
+        !searchTerm ||
         item.news.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.newsCategory.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.offerDetail.toLowerCase().includes(searchTerm.toLowerCase());
+        (item.newsCategory &&
+          item.newsCategory.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (item.offerDetail &&
+          item.offerDetail.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (item.newsDescription &&
+          item.newsDescription
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase()));
       const matchesRelevance = item.relevanceScore >= relevanceFilter;
 
       return matchesOffer && matchesSearch && matchesRelevance;
     });
-  }, [data.relevanceMatrix, selectedOffer, searchTerm, relevanceFilter]);
+  }, [combinedRelevanceMatrix, selectedOffer, searchTerm, relevanceFilter]);
 
   // Grouper les résultats par actualité
   const groupedByNews = useMemo(() => {
@@ -807,7 +287,10 @@ const MatrixApp = () => {
         grouped[item.news] = {
           news: item.news,
           newsDate: item.newsDate,
-          newsCategory: item.newsCategory,
+          newsCategory: item.newsCategory || "Actualité",
+          newsDescription: item.newsDescription || "",
+          newsLink: item.newsLink || "",
+          isRss: item.newsLink ? true : false, // Si un lien existe, c'est une actualité RSS
           offers: [],
         };
       }
@@ -853,8 +336,8 @@ const MatrixApp = () => {
         valueA = a.name.toLowerCase();
         valueB = b.name.toLowerCase();
       } else if (sortBy === "cm1") {
-        valueA = parseFloat(a.cm1.replace(",", ".")) || 0;
-        valueB = parseFloat(b.cm1.replace(",", ".")) || 0;
+        valueA = parseFloat(a.cm1?.replace(",", ".")) || 0;
+        valueB = parseFloat(b.cm1?.replace(",", ".")) || 0;
       }
 
       if (sortOrder === "asc") {
@@ -865,645 +348,788 @@ const MatrixApp = () => {
     });
   };
 
-  // Gestion du chargement
+  // Fermer le menu et la recherche quand on clique à l'extérieur
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showMenu && !event.target.closest(".premium-menu-container")) {
+        setShowMenu(false);
+      }
+      if (
+        showSearch &&
+        !event.target.closest(".search-container") &&
+        !event.target.closest(".search-toggle")
+      ) {
+        setShowSearch(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showMenu, showSearch]);
+
+  // Si chargement en cours
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-xl font-medium text-gray-600">
-          Chargement des données...
-        </div>
+      <div className="premium-loading">
+        <div className="premium-spinner"></div>
+        <div className="premium-loading-text">Chargement des données...</div>
       </div>
     );
   }
 
   return (
-    <div className="p-4 max-w-6xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4 text-center">
-        Matrice Offres BearingPoint / Actualités Schneider Electric
-      </h1>
-      <h2 className="text-sm text-center text-gray-500 mb-6">Version 5.0</h2>
-
-      {/* Tabs */}
-      <div className="mb-6 flex border-b">
-        <button
-          className={`py-2 px-4 font-medium ${
-            activeTab === "matrix"
-              ? "border-b-2 border-blue-500 text-blue-600"
-              : "text-gray-500"
-          }`}
-          onClick={() => setActiveTab("matrix")}
-        >
-          Matrice Actualités / Offres
-        </button>
-        <button
-          className={`py-2 px-4 font-medium ${
-            activeTab === "opportunities"
-              ? "border-b-2 border-blue-500 text-blue-600"
-              : "text-gray-500"
-          }`}
-          onClick={() => setActiveTab("opportunities")}
-        >
-          Opportunités par Offre
-        </button>
-      </div>
-
-      {activeTab === "matrix" && (
-        <>
-          <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Filtrer par offre BearingPoint:
-              </label>
-              <select
-                className="w-full p-2 border rounded"
-                value={selectedOffer}
-                onChange={(e) => setSelectedOffer(e.target.value)}
+    <div className="premium-app">
+      {/* Navigation principale */}
+      <nav className={`premium-navbar ${scrolled ? "scrolled" : ""}`}>
+        <div className="premium-navbar-container">
+          <div className="premium-navbar-brand">
+            <div className="premium-logo">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 80 80"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
               >
-                <option value="all">Toutes les offres</option>
-                {Object.keys(data.bpOffers).map((offer) => (
-                  <option key={offer} value={offer}>
-                    {offer}
-                  </option>
-                ))}
-              </select>
+                <path
+                  d="M40 0C17.909 0 0 17.909 0 40C0 62.091 17.909 80 40 80C62.091 80 80 62.091 80 40C80 17.909 62.091 0 40 0ZM40 3.846C60 3.846 76.154 20 76.154 40C76.154 60 60 76.154 40 76.154C20 76.154 3.846 60 3.846 40C3.846 20 20 3.846 40 3.846Z"
+                  fill="currentColor"
+                />
+                <path
+                  d="M40 17.778C37.7908 17.778 36 19.5688 36 21.778V50.578L26.3234 40.9014C24.7658 39.3438 22.2342 39.3438 20.6766 40.9014C19.119 42.459 19.119 44.9906 20.6766 46.5482L37.1766 62.988C38.7342 64.5456 41.2658 64.5456 42.8234 62.988L59.2828 46.5482C60.8404 44.9906 60.8404 42.459 59.2828 40.9014C57.7252 39.3438 55.1936 39.3438 53.636 40.9014L44 50.578V21.778C44 19.5688 42.2092 17.778 40 17.778Z"
+                  fill="currentColor"
+                />
+              </svg>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Recherche:
-              </label>
-              <input
-                type="text"
-                className="w-full p-2 border rounded"
-                placeholder="Rechercher une actualité, catégorie ou offre..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Score de pertinence minimum:
-              </label>
-              <select
-                className="w-full p-2 border rounded"
-                value={relevanceFilter}
-                onChange={(e) => setRelevanceFilter(parseInt(e.target.value))}
-              >
-                <option value="0">Tous les scores</option>
-                <option value="1">1 et plus</option>
-                <option value="2">2 et plus</option>
-                <option value="3">3 et plus</option>
-              </select>
-            </div>
+            <span className="premium-brand-name">BearingPoint</span>
           </div>
 
-          <div className="bg-gray-100 p-4 mb-4 rounded">
-            <p className="text-sm font-medium">
-              Explication du score de pertinence:
-            </p>
-            <p className="text-xs">
-              3 = Très pertinent | 2 = Pertinent | 1 = Légèrement pertinent
-            </p>
+          <div className="premium-navbar-menu">
+            <button
+              className={`premium-nav-link ${
+                activeTab === "matrix" ? "active" : ""
+              }`}
+              onClick={() => setActiveTab("matrix")}
+            >
+              Matrice
+            </button>
+            <button
+              className={`premium-nav-link ${
+                activeTab === "opportunities" ? "active" : ""
+              }`}
+              onClick={() => setActiveTab("opportunities")}
+            >
+              Opportunités
+            </button>
           </div>
 
-          {Object.values(groupedByNews).length > 0 ? (
-            <div className="space-y-6">
-              {Object.values(groupedByNews).map((group, index) => (
-                <div
-                  key={index}
-                  className="border rounded shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden"
+          <div className="premium-navbar-actions">
+            <button
+              className={`premium-action-button search-toggle ${
+                showSearch ? "active" : ""
+              }`}
+              onClick={() => {
+                setShowSearch(!showSearch);
+                if (showMenu) setShowMenu(false);
+              }}
+              title="Rechercher"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M11 19C15.4183 19 19 15.4183 19 11C19 6.58172 15.4183 3 11 3C6.58172 3 3 6.58172 3 11C3 15.4183 6.58172 19 11 19Z"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M21 21L16.65 16.65"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+
+            {/* Bouton de rafraîchissement des actualités RSS */}
+            <button
+              className={`premium-action-button ${
+                isLoadingRss ? "active" : ""
+              }`}
+              onClick={fetchRssNews}
+              disabled={isLoadingRss}
+              title="Rafraîchir les actualités"
+            >
+              {isLoadingRss ? (
+                <LoadingSpinner size="small" />
+              ) : (
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
                 >
-                  <div className="bg-gray-50 p-4">
-                    <h2 className="text-lg font-semibold">{group.news}</h2>
-                    <div className="flex justify-between text-sm mt-1">
-                      <span className="text-gray-600">{group.newsDate}</span>
-                      <span className="bg-blue-100 text-blue-800 py-1 px-2 rounded-full text-xs">
-                        {group.newsCategory}
-                      </span>
-                    </div>
-                  </div>
+                  <path
+                    d="M23 4V10H17"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M1 20V14H7"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M3.51 9.00001C4.01717 7.56586 4.87913 6.2899 6.01547 5.27495C7.1518 4.26 8.52547 3.54233 10.0083 3.1851C11.4911 2.82788 13.0348 2.84181 14.5091 3.22531C15.9834 3.6088 17.3421 4.34536 18.456 5.38801L23 10M1 14L5.544 18.612C6.65794 19.6547 8.01658 20.3912 9.49087 20.7747C10.9652 21.1582 12.5089 21.1721 13.9917 20.8149C15.4745 20.4577 16.8482 19.74 17.9845 18.7251C19.1209 17.7101 19.9828 16.4342 20.49 15"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
+            </button>
 
-                  <div className="p-4">
-                    <h3 className="font-medium mb-2">
-                      Offres BearingPoint pertinentes:
-                    </h3>
-                    <div className="space-y-2">
-                      {group.offers.map((offer, offerIdx) => (
-                        <div
-                          key={offerIdx}
-                          className="flex items-center justify-between bg-white p-3 border rounded hover:border-blue-300 transition-colors duration-200"
+            <button
+              className={`premium-action-button ${showMenu ? "active" : ""}`}
+              onClick={() => {
+                setShowMenu(!showMenu);
+                if (showSearch) setShowSearch(false);
+              }}
+              title="Menu"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M3 12H21"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M3 6H21"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M3 18H21"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
+
+          {/* Barre de recherche */}
+          {showSearch && (
+            <div className="search-container">
+              <div className="search-input-wrapper">
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Rechercher..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="premium-search-input"
+                />
+                {searchTerm && (
+                  <button
+                    className="search-clear-button"
+                    onClick={() => setSearchTerm("")}
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M18 6L6 18"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M6 6L18 18"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Menu déroulant */}
+          {showMenu && (
+            <div className="premium-menu-container">
+              <div className="premium-menu">
+                <div className="premium-menu-section">
+                  <h3 className="premium-menu-title">Filtres</h3>
+
+                  <div className="premium-menu-group">
+                    <span className="premium-menu-label">Ligne de service</span>
+                    <div className="premium-menu-items">
+                      <button
+                        onClick={() => {
+                          setSelectedOffer("all");
+                          setShowMenu(false);
+                        }}
+                        className={selectedOffer === "all" ? "active" : ""}
+                      >
+                        Toutes les offres
+                      </button>
+                      {Object.keys(serviceLineStats).map((serviceLine) => (
+                        <button
+                          key={serviceLine}
+                          onClick={() => {
+                            setSelectedOffer(serviceLine);
+                            setShowMenu(false);
+                          }}
+                          className={
+                            selectedOffer === serviceLine ? "active" : ""
+                          }
                         >
-                          <div>
-                            <span className="font-medium">
-                              {offer.category}
-                            </span>
-                            <span className="text-sm text-gray-600 block">
-                              {offer.detail}
-                            </span>
-                            {!offer.hasOpportunities && (
-                              <span className="mt-1 inline-block bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full">
-                                ⚠️ Pas d'opportunité en cours
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center">
-                            <span
-                              className={`ml-2 rounded-full w-8 h-8 flex items-center justify-center text-white font-medium
-                              ${
-                                offer.relevanceScore === 3
-                                  ? "bg-green-500"
-                                  : offer.relevanceScore === 2
-                                  ? "bg-blue-500"
-                                  : "bg-gray-500"
-                              }`}
-                            >
-                              {offer.relevanceScore}
-                            </span>
-                          </div>
-                        </div>
+                          {serviceLine}
+                        </button>
                       ))}
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              Aucun résultat trouvé pour les critères sélectionnés.
-            </div>
-          )}
 
-          {/* Liste des offres sans opportunités mais mentionnées dans les actualités */}
-          {offersWithNewsButNoOpp.length > 0 && (
-            <div className="mt-8 border-t pt-6">
-              <h2 className="text-lg font-semibold mb-3">
-                Offres mentionnées dans les actualités sans opportunités actives
-              </h2>
-              <div className="bg-yellow-50 border border-yellow-200 p-4 rounded">
-                <ul className="list-disc pl-4 space-y-1">
-                  {offersWithNewsButNoOpp.map((offer, idx) => (
-                    <li key={idx} className="font-medium">
-                      {offer}
-                      <span className="text-gray-600 ml-2">
-                        ({offeringToServiceLine[offer]})
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
-      {activeTab === "opportunities" && (
-        <div>
-          <div className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium mb-1">
-                Filtrer par ligne de service ou offre:
-              </label>
-              <select
-                className="w-full p-2 border rounded"
-                value={selectedOffer}
-                onChange={(e) => setSelectedOffer(e.target.value)}
-              >
-                <option value="all">Toutes les offres</option>
-                {Object.keys(serviceLineStats).map((serviceLine) => (
-                  <option key={serviceLine} value={serviceLine}>
-                    {serviceLine}
-                  </option>
-                ))}
-                {Object.keys(offeringStats)
-                  .filter(
-                    (offering) => offeringStats[offering].totalOpportunities > 0
-                  )
-                  .sort()
-                  .map((offering) => (
-                    <option key={offering} value={offering}>
-                      -- {offering}
-                    </option>
-                  ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Filtrer par année:
-              </label>
-              <select
-                className="w-full p-2 border rounded"
-                value={yearFilter}
-                onChange={(e) => setYearFilter(e.target.value)}
-              >
-                <option value="all">Toutes les années</option>
-                {Object.keys(yearlyStats)
-                  .sort()
-                  .reverse()
-                  .map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Trier par:
-              </label>
-              <div className="flex">
-                <select
-                  className="w-3/5 p-2 border rounded-l"
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                >
-                  <option value="date">Date</option>
-                  <option value="value">Valeur</option>
-                  <option value="name">Nom</option>
-                  <option value="cm1">CM1%</option>
-                </select>
-                <button
-                  className="w-2/5 bg-gray-100 border border-l-0 rounded-r p-2 flex items-center justify-center"
-                  onClick={() =>
-                    setSortOrder(sortOrder === "asc" ? "desc" : "asc")
-                  }
-                >
-                  {sortOrder === "asc" ? "Croissant ↑" : "Décroissant ↓"}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="mb-6">
-            <h2 className="text-lg font-semibold mb-2">
-              Statistiques des opportunités
-            </h2>
-            <div className="bg-blue-50 border border-blue-100 p-4 rounded mb-4">
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 text-xs">
-                {Object.keys(yearlyStats)
-                  .sort((a, b) => parseInt(b) - parseInt(a))
-                  .slice(0, 5)
-                  .map((year) => (
-                    <div
-                      key={year}
-                      className={`bg-white p-2 rounded shadow hover:shadow-md cursor-pointer transition-shadow duration-200 ${
-                        yearFilter === year ? "ring-2 ring-blue-500" : ""
-                      }`}
-                      onClick={() => setYearFilter(year)}
-                    >
-                      <div className="font-bold">{year}</div>
-                      <div>
-                        Opportunités: {yearlyStats[year].totalOpportunities}
-                      </div>
-                      <div>
-                        Gagnées: {yearlyStats[year].bookedOpportunities}
-                      </div>
-                      <div className="truncate">
-                        Valeur: {yearlyStats[year].totalValue.toLocaleString()}{" "}
-                        €
-                      </div>
-                      <div className="truncate">
-                        Taux:{" "}
-                        {(
-                          (yearlyStats[year].bookedOpportunities /
-                            yearlyStats[year].totalOpportunities) *
-                          100
-                        ).toFixed(1)}
-                        %
-                      </div>
+                  <div className="premium-menu-group">
+                    <span className="premium-menu-label">Actualités</span>
+                    <div className="premium-menu-items">
+                      <button
+                        onClick={() => {
+                          setShowRssOnly(false);
+                          setShowMenu(false);
+                        }}
+                        className={!showRssOnly ? "active" : ""}
+                      >
+                        Toutes les actualités
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowRssOnly(true);
+                          setShowMenu(false);
+                        }}
+                        className={showRssOnly ? "active" : ""}
+                      >
+                        Actualités RSS seulement
+                      </button>
                     </div>
-                  ))}
+                  </div>
+
+                  <div className="premium-menu-group">
+                    <span className="premium-menu-label">
+                      Score de pertinence
+                    </span>
+                    <div className="premium-menu-items">
+                      <button
+                        onClick={() => {
+                          setRelevanceFilter(0);
+                          setShowMenu(false);
+                        }}
+                        className={relevanceFilter === 0 ? "active" : ""}
+                      >
+                        Tous les scores
+                      </button>
+                      <button
+                        onClick={() => {
+                          setRelevanceFilter(1);
+                          setShowMenu(false);
+                        }}
+                        className={relevanceFilter === 1 ? "active" : ""}
+                      >
+                        1 et plus
+                      </button>
+                      <button
+                        onClick={() => {
+                          setRelevanceFilter(2);
+                          setShowMenu(false);
+                        }}
+                        className={relevanceFilter === 2 ? "active" : ""}
+                      >
+                        2 et plus
+                      </button>
+                      <button
+                        onClick={() => {
+                          setRelevanceFilter(3);
+                          setShowMenu(false);
+                        }}
+                        className={relevanceFilter === 3 ? "active" : ""}
+                      >
+                        3 seulement
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="premium-menu-group">
+                    <span className="premium-menu-label">Années</span>
+                    <div className="premium-menu-items">
+                      <button
+                        onClick={() => {
+                          setYearFilter("all");
+                          setShowMenu(false);
+                        }}
+                        className={yearFilter === "all" ? "active" : ""}
+                      >
+                        Toutes les années
+                      </button>
+                      {Object.keys(yearlyStats)
+                        .sort((a, b) => parseInt(b) - parseInt(a))
+                        .map((year) => (
+                          <button
+                            key={year}
+                            onClick={() => {
+                              setYearFilter(year);
+                              setShowMenu(false);
+                            }}
+                            className={yearFilter === year ? "active" : ""}
+                          >
+                            {year}
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="premium-menu-section">
+                  <h3 className="premium-menu-title">Légende</h3>
+                  <div className="premium-menu-relevance">
+                    <div className="premium-relevance-item">
+                      <div className="premium-relevance-badge relevance-3">
+                        3
+                      </div>
+                      <span>Très pertinent</span>
+                    </div>
+                    <div className="premium-relevance-item">
+                      <div className="premium-relevance-badge relevance-2">
+                        2
+                      </div>
+                      <span>Pertinent</span>
+                    </div>
+                    <div className="premium-relevance-item">
+                      <div className="premium-relevance-badge relevance-1">
+                        1
+                      </div>
+                      <span>Légèrement pertinent</span>
+                    </div>
+                  </div>
+
+                  {lastRssUpdate && (
+                    <div className="premium-rss-info">
+                      <h3 className="premium-menu-title">Actualités RSS</h3>
+                      <p className="premium-rss-update">
+                        Dernière mise à jour: {lastRssUpdate.toLocaleString()}
+                      </p>
+                      <p className="premium-rss-count">
+                        {rssNews.length} actualités chargées
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
+          )}
+        </div>
+      </nav>
 
-            <div className="overflow-x-auto">
-              <table className="min-w-full bg-white border">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ligne de service / Offre
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Total Opps
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Gagnées
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Perdues
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Taux de succès
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Valeur Estimée
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {Object.entries(serviceLineStats)
-                    .filter(
-                      ([serviceLine, _]) =>
-                        selectedOffer === "all" ||
-                        serviceLine === selectedOffer ||
-                        (Object.keys(offeringStats).includes(selectedOffer) &&
-                          offeringToServiceLine[selectedOffer] === serviceLine)
-                    )
-                    .map(([serviceLine, stats]) => (
-                      <React.Fragment key={serviceLine}>
-                        {/* Ligne de service */}
-                        <tr
-                          className="bg-gray-100 hover:bg-gray-200 cursor-pointer font-medium"
-                          onClick={() =>
-                            setExpandedServiceLine(
-                              expandedServiceLine === serviceLine
-                                ? null
-                                : serviceLine
-                            )
-                          }
-                        >
-                          <td className="px-4 py-2 flex items-center">
-                            <span
-                              className={`mr-2 transition-transform duration-200 ${
-                                expandedServiceLine === serviceLine
-                                  ? "transform rotate-90"
-                                  : ""
-                              }`}
-                            >
-                              ▶
-                            </span>
-                            {serviceLine}
-                          </td>
-                          <td className="px-4 py-2">
-                            {stats.totalOpportunities}
-                          </td>
-                          <td className="px-4 py-2">
-                            {stats.bookedOpportunities}
-                          </td>
-                          <td className="px-4 py-2">
-                            {stats.lostOpportunities}
-                          </td>
-                          <td className="px-4 py-2">
-                            {stats.totalOpportunities > 0
-                              ? (
-                                  (stats.bookedOpportunities /
-                                    stats.totalOpportunities) *
-                                  100
-                                ).toFixed(1)
-                              : "0.0"}
-                            %
-                          </td>
-                          <td className="px-4 py-2">
-                            {stats.totalEstimatedValue.toLocaleString()} €
-                          </td>
-                        </tr>
-
-                        {/* Offres par ligne de service avec leurs opportunités */}
-                        {expandedServiceLine === serviceLine && (
-                          <>
-                            {stats.offerings
-                              .filter((offering) => {
-                                if (
-                                  Object.keys(offeringStats).includes(
-                                    selectedOffer
-                                  ) &&
-                                  offeringToServiceLine[selectedOffer] ===
-                                    serviceLine
-                                ) {
-                                  return offering === selectedOffer;
-                                }
-                                return true;
-                              })
-                              .sort()
-                              .map((offering) => {
-                                const offerStats = offeringStats[offering] || {
-                                  totalOpportunities: 0,
-                                  bookedOpportunities: 0,
-                                  lostOpportunities: 0,
-                                  winRate: "0.0",
-                                  totalEstimatedValue: 0,
-                                  totalBookedValue: 0,
-                                };
-
-                                // Vérifier si cette offre apparaît dans les actualités
-                                const isInNews = data.relevanceMatrix.some(
-                                  (item) =>
-                                    item.offerDetail
-                                      .split(", ")
-                                      .some(
-                                        (detail) =>
-                                          detail === offering ||
-                                          detail.includes(offering) ||
-                                          offering.includes(detail)
-                                      )
-                                );
-
-                                const rowClass =
-                                  isInNews &&
-                                  offerStats.totalOpportunities === 0
-                                    ? "bg-yellow-50 hover:bg-yellow-100 font-medium"
-                                    : offerStats.totalOpportunities === 0
-                                    ? "text-gray-400 hover:bg-gray-50"
-                                    : "hover:bg-gray-50 cursor-pointer";
-
-                                return (
-                                  <React.Fragment key={offering}>
-                                    <tr
-                                      className={rowClass}
-                                      onClick={() =>
-                                        offerStats.totalOpportunities > 0
-                                          ? setExpandedOffer(
-                                              expandedOffer === offering
-                                                ? null
-                                                : offering
-                                            )
-                                          : null
-                                      }
-                                    >
-                                      <td className="px-4 py-2 pl-8 flex items-center">
-                                        {offerStats.totalOpportunities > 0 && (
-                                          <span
-                                            className={`mr-2 transition-transform duration-200 ${
-                                              expandedOffer === offering
-                                                ? "transform rotate-90"
-                                                : ""
-                                            }`}
-                                          >
-                                            ▶
-                                          </span>
-                                        )}
-                                        {offering}
-                                        {isInNews &&
-                                          offerStats.totalOpportunities ===
-                                            0 && (
-                                            <span className="ml-2 text-xs text-yellow-700">
-                                              ⚠️ Actualité sans opportunité
-                                            </span>
-                                          )}
-                                      </td>
-                                      <td className="px-4 py-2">
-                                        {offerStats.totalOpportunities || 0}
-                                      </td>
-                                      <td className="px-4 py-2">
-                                        {offerStats.bookedOpportunities || 0}
-                                      </td>
-                                      <td className="px-4 py-2">
-                                        {offerStats.lostOpportunities || 0}
-                                      </td>
-                                      <td className="px-4 py-2">
-                                        {offerStats.winRate || "0.0"}%
-                                      </td>
-                                      <td className="px-4 py-2">
-                                        {(
-                                          offerStats.totalEstimatedValue || 0
-                                        ).toLocaleString()}{" "}
-                                        €
-                                      </td>
-                                    </tr>
-
-                                    {/* Détail des opportunités directement sous chaque offre */}
-                                    {expandedOffer === offering &&
-                                      offerStats.totalOpportunities > 0 && (
-                                        <tr>
-                                          <td colSpan="6" className="px-0 py-2">
-                                            <div className="mx-8 mb-4">
-                                              <div className="flex justify-between items-center mb-2">
-                                                <h4 className="text-sm font-medium text-blue-600">
-                                                  Détail des opportunités
-                                                </h4>
-                                                <span className="text-sm text-gray-500">
-                                                  {yearFilter === "all"
-                                                    ? "Toutes années"
-                                                    : `Année ${yearFilter}`}
-                                                </span>
-                                              </div>
-                                              <div className="space-y-3">
-                                                {sortOpportunities(
-                                                  filteredOpportunities(
-                                                    opportunitiesByOffering[
-                                                      offering
-                                                    ]
-                                                  )
-                                                ).map((opp) => (
-                                                  <div
-                                                    key={opp.id}
-                                                    className={`border p-3 rounded hover:shadow-sm transition-shadow duration-200 ${
-                                                      opp.status.includes(
-                                                        "Booked"
-                                                      )
-                                                        ? "border-green-200 bg-green-50"
-                                                        : "border-red-200 bg-red-50"
-                                                    }`}
-                                                  >
-                                                    <div className="flex justify-between">
-                                                      <span className="font-medium">
-                                                        {opp.name}
-                                                      </span>
-                                                      <span
-                                                        className={`text-sm px-2 py-1 rounded-full ${
-                                                          opp.status.includes(
-                                                            "Booked"
-                                                          )
-                                                            ? "bg-green-100 text-green-800"
-                                                            : "bg-red-100 text-red-800"
-                                                        }`}
-                                                      >
-                                                        {opp.status.includes(
-                                                          "Booked"
-                                                        )
-                                                          ? "Gagné"
-                                                          : "Perdu"}
-                                                      </span>
-                                                    </div>
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2 text-sm">
-                                                      <div>
-                                                        <span className="text-gray-500">
-                                                          ID:
-                                                        </span>{" "}
-                                                        {opp.id}
-                                                      </div>
-                                                      <div>
-                                                        <span className="text-gray-500">
-                                                          Date de clôture:
-                                                        </span>{" "}
-                                                        {opp.closeDate}
-                                                      </div>
-                                                      <div>
-                                                        <span className="text-gray-500">
-                                                          Valeur estimée:
-                                                        </span>{" "}
-                                                        {opp.estimatedValue.toLocaleString()}{" "}
-                                                        €
-                                                      </div>
-                                                      <div>
-                                                        <span className="text-gray-500">
-                                                          Manager:
-                                                        </span>{" "}
-                                                        {opp.accountManager ||
-                                                          "-"}
-                                                      </div>
-                                                      <div>
-                                                        <span className="text-gray-500">
-                                                          CM1%:
-                                                        </span>{" "}
-                                                        {opp.cm1 || "-"}
-                                                      </div>
-                                                      <div>
-                                                        <span className="text-gray-500">
-                                                          Revenu brut:
-                                                        </span>{" "}
-                                                        {opp.grossRevenue.toLocaleString()}{" "}
-                                                        €
-                                                      </div>
-                                                      <div className="md:col-span-2">
-                                                        <span className="text-gray-500">
-                                                          Ligne de service:
-                                                        </span>{" "}
-                                                        {opp.serviceLine}
-                                                      </div>
-                                                      {opp.comment && (
-                                                        <div className="md:col-span-2">
-                                                          <span className="text-gray-500">
-                                                            Commentaire:
-                                                          </span>{" "}
-                                                          {opp.comment}
-                                                        </div>
-                                                      )}
-                                                    </div>
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            </div>
-                                          </td>
-                                        </tr>
-                                      )}
-                                  </React.Fragment>
-                                );
-                              })}
-                          </>
-                        )}
-                      </React.Fragment>
-                    ))}
-                </tbody>
-              </table>
-            </div>
+      <main className="premium-main">
+        <div className="premium-banner">
+          <div className="premium-banner-content">
+            <h1>Matrice BearingPoint / Schneider Electric</h1>
+            <p className="premium-banner-subtitle">
+              Analyse de l'adéquation entre actualités et offres
+            </p>
           </div>
         </div>
-      )}
 
-      <div className="mt-8 text-center text-sm text-gray-500">
-        <p>
-          Analyse basée sur les offres BearingPoint, les actualités Schneider
-          Electric et les opportunités depuis 2018
-        </p>
-        <p className="mt-1 text-xs text-gray-400">
-          Version 5.0 - Dernière mise à jour: 15/04/2025
-        </p>
-      </div>
+        <div className="premium-container">
+          <div className="premium-filters">
+            <div className="premium-filter-controls">
+              <div className="premium-selector">
+                <label htmlFor="serviceLineSelect">Ligne de service:</label>
+                <select
+                  id="serviceLineSelect"
+                  value={selectedOffer}
+                  onChange={(e) => setSelectedOffer(e.target.value)}
+                  className="premium-select"
+                >
+                  <option value="all">Toutes les offres</option>
+                  {Object.keys(serviceLineStats).map((serviceLine) => (
+                    <option key={serviceLine} value={serviceLine}>
+                      {serviceLine}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {activeTab === "matrix" && (
+                <>
+                  <div className="premium-selector">
+                    <label htmlFor="relevanceSelect">Pertinence minimum:</label>
+                    <select
+                      id="relevanceSelect"
+                      value={relevanceFilter}
+                      onChange={(e) =>
+                        setRelevanceFilter(parseInt(e.target.value))
+                      }
+                      className="premium-select"
+                    >
+                      <option value="0">Tous les scores</option>
+                      <option value="1">1 et plus</option>
+                      <option value="2">2 et plus</option>
+                      <option value="3">3 seulement</option>
+                    </select>
+                  </div>
+
+                  <div className="premium-selector">
+                    <label htmlFor="newsSourceSelect">Source:</label>
+                    <select
+                      id="newsSourceSelect"
+                      value={showRssOnly ? "rss" : "all"}
+                      onChange={(e) => setShowRssOnly(e.target.value === "rss")}
+                      className="premium-select"
+                    >
+                      <option value="all">Toutes les actualités</option>
+                      <option value="rss">Actualités RSS seulement</option>
+                    </select>
+                  </div>
+                </>
+              )}
+
+              {activeTab === "opportunities" && (
+                <div className="premium-selector">
+                  <label htmlFor="yearSelect">Année:</label>
+                  <select
+                    id="yearSelect"
+                    value={yearFilter}
+                    onChange={(e) => setYearFilter(e.target.value)}
+                    className="premium-select"
+                  >
+                    <option value="all">Toutes les années</option>
+                    {Object.keys(yearlyStats)
+                      .sort((a, b) => parseInt(b) - parseInt(a))
+                      .map((year) => (
+                        <option key={year} value={year}>
+                          {year}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
+
+              {activeTab === "opportunities" && (
+                <div className="premium-selector">
+                  <label htmlFor="sortSelect">Trier par:</label>
+                  <div className="premium-sort-controls">
+                    <select
+                      id="sortSelect"
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value)}
+                      className="premium-select sort-select"
+                    >
+                      <option value="date">Date</option>
+                      <option value="value">Valeur</option>
+                      <option value="name">Nom</option>
+                      <option value="cm1">CM1%</option>
+                    </select>
+                    <button
+                      className="premium-sort-button"
+                      onClick={() =>
+                        setSortOrder(sortOrder === "asc" ? "desc" : "asc")
+                      }
+                    >
+                      {sortOrder === "asc" ? (
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M12 19V5"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <path
+                            d="M5 12L12 5L19 12"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      ) : (
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M12 5V19"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <path
+                            d="M19 12L12 19L5 12"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Bouton de rafraîchissement des actualités RSS */}
+              {activeTab === "matrix" && (
+                <div className="premium-selector">
+                  <label htmlFor="refreshRss">Actualités RSS:</label>
+                  <button
+                    id="refreshRss"
+                    className="premium-button"
+                    onClick={fetchRssNews}
+                    disabled={isLoadingRss}
+                  >
+                    {isLoadingRss ? (
+                      <>
+                        <LoadingSpinner size="small" />
+                        Mise à jour...
+                      </>
+                    ) : (
+                      <>
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                          style={{ marginRight: "8px" }}
+                        >
+                          <path
+                            d="M23 4V10H17"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <path
+                            d="M1 20V14H7"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <path
+                            d="M3.51 9.00001C4.01717 7.56586 4.87913 6.2899 6.01547 5.27495C7.1518 4.26 8.52547 3.54233 10.0083 3.1851C11.4911 2.82788 13.0348 2.84181 14.5091 3.22531C15.9834 3.6088 17.3421 4.34536 18.456 5.38801L23 10M1 14L5.544 18.612C6.65794 19.6547 8.01658 20.3912 9.49087 20.7747C10.9652 21.1582 12.5089 21.1721 13.9917 20.8149C15.4745 20.4577 16.8482 19.74 17.9845 18.7251C19.1209 17.7101 19.9828 16.4342 20.49 15"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                        Rafraîchir
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {searchTerm && (
+              <div className="premium-search-results">
+                <div className="premium-search-term">
+                  <span>Recherche: </span>
+                  <strong>{searchTerm}</strong>
+                  <button
+                    className="premium-clear-search"
+                    onClick={() => setSearchTerm("")}
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M18 6L6 18"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M6 6L18 18"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Affichage d'un badge pour indiquer que l'on ne voit que les actualités RSS */}
+            {showRssOnly && (
+              <div className="premium-rss-banner">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M4 11C6.38695 11 8.67613 11.9482 10.364 13.636C12.0518 15.3239 13 17.6131 13 20"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M4 4C8.24346 4 12.3131 5.68571 15.3137 8.68629C18.3143 11.6869 20 15.7565 20 20"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M5 20C5.55228 20 6 19.5523 6 19C6 18.4477 5.55228 18 5 18C4.44772 18 4 18.4477 4 19C4 19.5523 4.44772 20 5 20Z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <span>Affichage des actualités RSS uniquement</span>
+                <button onClick={() => setShowRssOnly(false)}>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M18 6L6 18"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M6 6L18 18"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="premium-content">
+            {activeTab === "matrix" ? (
+              <MatrixTabContent
+                groupedByNews={groupedByNews}
+                offersWithNewsButNoOpp={offersWithNewsButNoOpp}
+                offeringToServiceLine={offeringToServiceLine}
+                isLoadingRss={isLoadingRss}
+              />
+            ) : (
+              <OpportunitiesTabContent
+                data={data}
+                selectedOffer={selectedOffer}
+                setSelectedOffer={setSelectedOffer}
+                yearFilter={yearFilter}
+                setYearFilter={setYearFilter}
+                sortBy={sortBy}
+                setSortBy={setSortBy}
+                sortOrder={sortOrder}
+                setSortOrder={setSortOrder}
+                serviceLineStats={serviceLineStats}
+                offeringStats={offeringStats}
+                yearlyStats={yearlyStats}
+                opportunitiesByOffering={opportunitiesByOffering}
+                offeringToServiceLine={offeringToServiceLine}
+                extractYear={extractYear}
+                filteredOpportunities={filteredOpportunities}
+                sortOpportunities={sortOpportunities}
+                expandedServiceLine={expandedServiceLine}
+                setExpandedServiceLine={setExpandedServiceLine}
+                expandedOffer={expandedOffer}
+                setExpandedOffer={setExpandedOffer}
+              />
+            )}
+          </div>
+        </div>
+      </main>
+
+      <footer className="premium-footer">
+        <div className="premium-footer-content">
+          <p>
+            Analyse basée sur les offres BearingPoint, les actualités Schneider
+            Electric et les opportunités depuis 2018
+          </p>
+          {lastRssUpdate && (
+            <p>
+              Dernière mise à jour des actualités RSS:{" "}
+              {lastRssUpdate.toLocaleString()}
+            </p>
+          )}
+          <p className="premium-version">
+            Version 6.0 - Dernière mise à jour: 15/04/2025
+          </p>
+        </div>
+      </footer>
     </div>
   );
 };
 
-export default MatrixApp;
+export default App;
