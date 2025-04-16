@@ -3,7 +3,8 @@
  * Utilise l'API RSS2JSON pour convertir les flux RSS en JSON
  */
 
-import { contactExtractionService } from "./contactExtractionService";
+// Suppression de l'import problématique
+// import { contactExtractionService } from "./contactExtractionService";
 
 // L'URL de l'API RSS2JSON (gratuite avec des limites, nécessite une inscription pour plus de requêtes)
 const RSS2JSON_API_URL = "https://api.rss2json.com/v1/api.json";
@@ -536,13 +537,11 @@ function isRelevantToSchneider(newsItem) {
   const content =
     `${newsItem.title} ${newsItem.description} ${newsItem.category}`.toLowerCase();
 
-  // Lors du débogage, accepter tous les articles
-  // Plus tard, rétablir cette condition
+  // Vérifier si l'un des mots-clés est présent dans le contenu
   return SCHNEIDER_KEYWORDS.some((keyword) =>
     content.includes(keyword.toLowerCase())
   );
 }
-
 // Fonction pour récupérer toutes les actualités de tous les flux RSS
 async function getAllNews() {
   try {
