@@ -1,31 +1,39 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { dataService } from "./services/dataService";
 import { rssFeedService } from "./services/rssFeedService";
-import MatrixTabContent from "./components/MatrixTabContent";
-import ServiceLineTabContent from "./components/ServiceLineTabContent";
-import ContactTabContent from "./components/ContactTabContent";
-import LoadingSpinner from "./components/LoadingSpinner";
-import "./premium-styles-enhanced.css";
+import MatrixTabContent from "./components/matrix/MatrixTabContent";
+import ServiceLineTabContent from "./components/servicelines/ServiceLineTabContent";
+import ContactTabContent from "./components/contacts/ContactTabContent";
+import LoadingSpinner from "./components/common/LoadingSpinner";
+import "./styles/main.css";
 
+/**
+ * Composant principal de l'application de suivi de compte pour la prospection commerciale
+ * @returns {JSX.Element} Application de suivi de compte
+ */
 const App = () => {
+  // États pour la navigation et les filtres
   const [activeTab, setActiveTab] = useState("actualites");
   const [selectedOffer, setSelectedOffer] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [relevanceFilter, setRelevanceFilter] = useState(0);
-  const [offersWithNewsButNoOpp, setOffersWithNewsButNoOpp] = useState([]);
   const [yearFilter, setYearFilter] = useState("all");
   const [sortBy, setSortBy] = useState("date");
   const [sortOrder, setSortOrder] = useState("desc");
+
+  // États pour l'interface utilisateur
   const [isLoading, setIsLoading] = useState(true);
   const [showSearch, setShowSearch] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const searchInputRef = useRef(null);
+
+  // États pour les flux RSS
   const [rssNews, setRssNews] = useState([]);
   const [isLoadingRss, setIsLoadingRss] = useState(false);
   const [rssRelevanceMatrix, setRssRelevanceMatrix] = useState([]);
   const [showRssOnly, setShowRssOnly] = useState(false);
   const [lastRssUpdate, setLastRssUpdate] = useState(null);
-  const searchInputRef = useRef(null);
 
   // États pour les données calculées
   const [opportunitiesByOffering, setOpportunitiesByOffering] = useState({});
@@ -33,24 +41,20 @@ const App = () => {
   const [serviceLineStats, setServiceLineStats] = useState({});
   const [yearlyStats, setYearlyStats] = useState({});
   const [offeringToServiceLine, setOfferingToServiceLine] = useState({});
+  const [offersWithNewsButNoOpp, setOffersWithNewsButNoOpp] = useState([]);
 
-  // Récupération des données
+  // Récupération des données principales
   const data = useMemo(() => dataService.getData(), []);
 
-  // Fusionner la matrice de pertinence des actualités stockées avec celles du flux RSS
+  // Fusionner la matrice de pertinence des actualités
   const combinedRelevanceMatrix = useMemo(() => {
-    // Toujours inclure toutes les sources de données (importées et RSS)
     return [...data.relevanceMatrix, ...rssRelevanceMatrix];
   }, [data.relevanceMatrix, rssRelevanceMatrix]);
 
   // Détecter le scroll pour changer le style de la navbar
   useEffect(() => {
     const handleScroll = () => {
-      if (window.scrollY > 10) {
-        setScrolled(true);
-      } else {
-        setScrolled(false);
-      }
+      setScrolled(window.scrollY > 10);
     };
 
     window.addEventListener("scroll", handleScroll);
@@ -64,41 +68,56 @@ const App = () => {
     }
   }, [showSearch]);
 
-  // Fonction auxiliaire pour extraire l'année d'une date au format "DD/MM/YYYY"
+  /**
+   * Extrait l'année d'une date au format "DD/MM/YYYY"
+   * @param {string} dateStr - Date au format DD/MM/YYYY
+   * @returns {string|null} L'année extraite ou null
+   */
   const extractYear = (dateStr) => {
     if (!dateStr) return null;
     const parts = dateStr.split("/");
-    if (parts.length === 3) {
-      return parts[2];
-    }
-    return null;
+    return parts.length === 3 ? parts[2] : null;
   };
 
-  // Fonction pour analyser les dates au format français
+  /**
+   * Parse une date au format français (DD Mmm. YYYY)
+   * @param {string} dateString - Date au format DD Mmm. YYYY
+   * @returns {Date} Objet Date
+   */
   const parseCustomDate = (dateString) => {
     // Mapping des mois abrégés en français vers leurs indices (0-11)
     const monthMap = {
-      'Janv.': 0, 'Févr.': 1, 'Mars': 2, 'Avr.': 3, 'Mai': 4, 'Juin': 5,
-      'Juil.': 6, 'Août': 7, 'Sept.': 8, 'Oct.': 9, 'Nov.': 10, 'Déc.': 11
+      "Janv.": 0,
+      "Févr.": 1,
+      Mars: 2,
+      "Avr.": 3,
+      Mai: 4,
+      Juin: 5,
+      "Juil.": 6,
+      Août: 7,
+      "Sept.": 8,
+      "Oct.": 9,
+      "Nov.": 10,
+      "Déc.": 11,
     };
-    
+
     // Découper la chaîne en composants
-    const parts = dateString.split(' ');
-    
+    const parts = dateString.split(" ");
+
     if (parts.length !== 3) {
       console.error(`Format de date non reconnu: ${dateString}`);
       return new Date(0); // Date par défaut en cas d'erreur
     }
-    
+
     const day = parseInt(parts[0], 10);
     const month = monthMap[parts[1]];
     const year = parseInt(parts[2], 10);
-    
+
     if (isNaN(day) || month === undefined || isNaN(year)) {
       console.error(`Impossible de parser la date: ${dateString}`);
       return new Date(0); // Date par défaut en cas d'erreur
     }
-    
+
     return new Date(year, month, day);
   };
 
@@ -224,30 +243,28 @@ const App = () => {
 
     // Identifier les offres mentionnées dans les actualités mais sans opportunités en cours
     const offersInNews = new Set();
-
     data.relevanceMatrix.forEach((item) => {
       const detailOfferings = item.offerDetail.split(", ");
       detailOfferings.forEach((detailOffer) => {
-        Object.entries(data.completeServiceLines).forEach(
-          ([serviceLine, offerings]) => {
-            offerings.forEach((offering) => {
-              if (
-                detailOffer.includes(offering) ||
-                offering.includes(detailOffer)
-              ) {
-                offersInNews.add(offering);
-              }
-            });
-          }
-        );
+        Object.entries(data.completeServiceLines).forEach(([_, offerings]) => {
+          offerings.forEach((offering) => {
+            if (
+              detailOffer.includes(offering) ||
+              offering.includes(detailOffer)
+            ) {
+              offersInNews.add(offering);
+            }
+          });
+        });
       });
     });
 
     const offersMissingOpps = Array.from(offersInNews).filter(
       (offer) => !oppByOffering[offer] || oppByOffering[offer].length === 0
     );
-
     setOffersWithNewsButNoOpp(offersMissingOpps);
+
+    // Terminer le chargement
     setIsLoading(false);
 
     // Charger le flux RSS au démarrage
@@ -285,26 +302,37 @@ const App = () => {
   const filteredMatrix = useMemo(() => {
     return combinedRelevanceMatrix.filter((item) => {
       // Filtre par offre
-      const matchesOffer = selectedOffer === "all" || item.offerCategory === selectedOffer;
-      
+      const matchesOffer =
+        selectedOffer === "all" || item.offerCategory === selectedOffer;
+
       // Filtre par terme de recherche
       const matchesSearch =
         !searchTerm ||
         item.news.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.newsCategory && 
+        (item.newsCategory &&
           item.newsCategory.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (item.offerDetail &&
           item.offerDetail.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (item.newsDescription &&
-          item.newsDescription.toLowerCase().includes(searchTerm.toLowerCase()));
-      
+          item.newsDescription
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase()));
+
       // Filtre par score de pertinence
       const matchesRelevance = item.relevanceScore >= relevanceFilter;
 
-      // Retirer la condition matchesSource pour toujours inclure les deux types d'actualités
-      return matchesOffer && matchesSearch && matchesRelevance;
+      // Filtre par source (RSS uniquement ou toutes les sources)
+      const matchesSource = !showRssOnly || item.newsLink;
+
+      return matchesOffer && matchesSearch && matchesRelevance && matchesSource;
     });
-  }, [combinedRelevanceMatrix, selectedOffer, searchTerm, relevanceFilter]);
+  }, [
+    combinedRelevanceMatrix,
+    selectedOffer,
+    searchTerm,
+    relevanceFilter,
+    showRssOnly,
+  ]);
 
   // Grouper les résultats par actualité
   const groupedByNews = useMemo(() => {
@@ -320,7 +348,7 @@ const App = () => {
           isRss: item.newsLink ? true : false, // Si un lien existe, c'est une actualité RSS
           offers: [],
           // Ajouter un objet Date pour faciliter le tri
-          dateObj: parseCustomDate(item.newsDate)
+          dateObj: parseCustomDate(item.newsDate),
         };
       }
 
@@ -437,19 +465,25 @@ const App = () => {
 
           <div className="premium-navbar-menu">
             <button
-              className={`premium-nav-link ${activeTab === "actualites" ? "active" : ""}`}
+              className={`premium-nav-link ${
+                activeTab === "actualites" ? "active" : ""
+              }`}
               onClick={() => setActiveTab("actualites")}
             >
               Actualités
             </button>
             <button
-              className={`premium-nav-link ${activeTab === "servicelines" ? "active" : ""}`}
+              className={`premium-nav-link ${
+                activeTab === "servicelines" ? "active" : ""
+              }`}
               onClick={() => setActiveTab("servicelines")}
             >
               Service Lines
             </button>
             <button
-              className={`premium-nav-link ${activeTab === "contacts" ? "active" : ""}`}
+              className={`premium-nav-link ${
+                activeTab === "contacts" ? "active" : ""
+              }`}
               onClick={() => setActiveTab("contacts")}
             >
               Contacts
@@ -457,6 +491,7 @@ const App = () => {
           </div>
 
           <div className="premium-navbar-actions">
+            {/* Bouton de recherche */}
             <button
               className={`premium-action-button search-toggle ${
                 showSearch ? "active" : ""
@@ -535,6 +570,7 @@ const App = () => {
               )}
             </button>
 
+            {/* Bouton de menu */}
             <button
               className={`premium-action-button ${showMenu ? "active" : ""}`}
               onClick={() => {
@@ -808,6 +844,7 @@ const App = () => {
         <div className="premium-container">
           <div className="premium-filters">
             <div className="premium-filter-controls">
+              {/* Sélecteur de ligne de service */}
               <div className="premium-selector">
                 <label htmlFor="serviceLineSelect">Ligne de service:</label>
                 <select
@@ -825,6 +862,7 @@ const App = () => {
                 </select>
               </div>
 
+              {/* Filtres de l'onglet Actualités */}
               {activeTab === "actualites" && (
                 <>
                   <div className="premium-selector">
@@ -859,6 +897,7 @@ const App = () => {
                 </>
               )}
 
+              {/* Filtre de l'onglet Service Lines */}
               {activeTab === "servicelines" && (
                 <div className="premium-selector">
                   <label htmlFor="relevanceSelect">Pertinence minimum:</label>
@@ -878,7 +917,7 @@ const App = () => {
                 </div>
               )}
 
-              {/* Bouton de rafraîchissement des actualités RSS */}
+              {/* Bouton de rafraîchissement des actualités RSS (sauf pour l'onglet Contacts) */}
               {activeTab !== "contacts" && (
                 <div className="premium-selector">
                   <label htmlFor="refreshRss">Actualités RSS:</label>
@@ -933,6 +972,7 @@ const App = () => {
               )}
             </div>
 
+            {/* Résultats de recherche */}
             {searchTerm && (
               <div className="premium-search-results">
                 <div className="premium-search-term">
@@ -969,7 +1009,7 @@ const App = () => {
               </div>
             )}
 
-            {/* Affichage d'un badge pour indiquer que l'on ne voit que les actualités RSS */}
+            {/* Bannière RSS uniquement */}
             {showRssOnly && (
               <div className="premium-rss-banner">
                 <svg
@@ -1030,6 +1070,7 @@ const App = () => {
             )}
           </div>
 
+          {/* Contenu principal selon l'onglet actif */}
           <div className="premium-content">
             {activeTab === "actualites" && (
               <MatrixTabContent
@@ -1039,7 +1080,7 @@ const App = () => {
                 isLoadingRss={isLoadingRss}
               />
             )}
-            
+
             {activeTab === "servicelines" && (
               <ServiceLineTabContent
                 data={data}
@@ -1049,7 +1090,7 @@ const App = () => {
                 relevanceFilter={relevanceFilter}
               />
             )}
-            
+
             {activeTab === "contacts" && (
               <ContactTabContent
                 combinedRelevanceMatrix={combinedRelevanceMatrix}

@@ -1,8 +1,12 @@
 import React from "react";
 import ReactDOM from "react-dom";
-import "./styles.css";
 import App from "./App";
+import "./styles/main.css";
 
+/**
+ * Point d'entrée de l'application
+ * Rend le composant App dans l'élément racine
+ */
 ReactDOM.render(
   <React.StrictMode>
     <App />
