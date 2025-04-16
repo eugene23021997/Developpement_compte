@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { ExternalLinkIcon } from "./Icons";
-import KeywordsList from "./KeywordsList";
 
 /**
  * Composant pour afficher une carte d'actualité avec argumentaires de pertinence
@@ -21,6 +20,7 @@ const NewsCard = ({ news }) => {
   // États pour l'expansion de la carte et la sélection d'offre
   const [expanded, setExpanded] = useState(false);
   const [selectedOfferIndex, setSelectedOfferIndex] = useState(null);
+  const [showLegend, setShowLegend] = useState(false);
 
   // Fonction pour déterminer si une offre a un fort potentiel commercial
   const isHighPotentialOffer = (offer) => {
@@ -76,7 +76,20 @@ const NewsCard = ({ news }) => {
         lowerKeyword.includes('cloud')) {
       return 'tech';
     }
-    return '';
+    if (lowerKeyword.includes('invest') || lowerKeyword.includes('acquisition') || 
+        lowerKeyword.includes('fusion')) {
+      return 'investment';
+    }
+    if (lowerKeyword.includes('rh') || lowerKeyword.includes('ressources') || 
+        lowerKeyword.includes('social')) {
+      return 'hr';
+    }
+    if (lowerKeyword.includes('développement') || lowerKeyword.includes('durable') || 
+        lowerKeyword.includes('green') || lowerKeyword.includes('économie circulaire')) {
+      return 'sustainability';
+    }
+    // Pour tous les autres mots-clés, attribuer une classe par défaut
+    return 'default';
   };
 
   // Générer un argumentaire de pertinence court et précis
@@ -143,6 +156,25 @@ const NewsCard = ({ news }) => {
     }
   };
 
+  // Données pour la légende des mots-clés
+  const keywordLegend = [
+    { class: 'ai', label: 'IA & Machine Learning' },
+    { class: 'data', label: 'Données & Analytics' },
+    { class: 'security', label: 'Cybersécurité' },
+    { class: 'finance', label: 'Finance & Risque' },
+    { class: 'tech', label: 'Technologie & Digital' },
+    { class: 'investment', label: 'Investissement & M&A' },
+    { class: 'hr', label: 'Ressources Humaines' },
+    { class: 'sustainability', label: 'Développement Durable' },
+    { class: 'default', label: 'Autres thématiques' }
+  ];
+
+  // Afficher la légende
+  const toggleLegend = (e) => {
+    e.stopPropagation();
+    setShowLegend(!showLegend);
+  };
+
   return (
     <div
       className={`premium-news-card ${
@@ -167,6 +199,39 @@ const NewsCard = ({ news }) => {
         >
           <span className="premium-news-date">{newsDate}</span>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            {/* Bouton pour afficher la légende */}
+            <button 
+              className="premium-legend-toggle" 
+              onClick={toggleLegend}
+              title="Afficher/masquer la légende des codes couleur"
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "4px",
+                borderRadius: "4px",
+                color: "var(--text-tertiary)",
+              }}
+            >
+              <svg 
+                width="16" 
+                height="16" 
+                viewBox="0 0 24 24" 
+                fill="none"
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+              </svg>
+            </button>
+            
             {/* Indicateur visuel discret d'opportunité de prospection */}
             {hasHighPotential && (
               <div
@@ -201,7 +266,49 @@ const NewsCard = ({ news }) => {
           )}
         </h3>
 
-        {/* Affichage des mots-clés avec les nouveaux badges */}
+        {/* Légende des mots-clés (conditionnelle) */}
+        {showLegend && (
+          <div 
+            className="premium-keywords-legend"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              marginTop: "12px",
+              padding: "10px",
+              backgroundColor: "rgba(255, 255, 255, 0.8)",
+              borderRadius: "8px",
+              border: "1px solid rgba(0, 0, 0, 0.05)",
+              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)",
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+              gap: "8px",
+              fontSize: "12px",
+            }}
+          >
+            {keywordLegend.map((item, idx) => (
+              <div 
+                key={idx} 
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
+              >
+                <span 
+                  className={`premium-keyword-badge ${item.class}`}
+                  style={{
+                    width: "12px",
+                    height: "12px",
+                    padding: 0,
+                    minWidth: "12px",
+                  }}
+                ></span>
+                <span>{item.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Affichage des mots-clés avec les badges colorés */}
         {newsCategory && (
           <div style={{ marginTop: "12px" }}>
             <div className="premium-keywords-container">
