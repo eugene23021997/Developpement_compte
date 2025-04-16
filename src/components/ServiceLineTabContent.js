@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import NewsCard from "./matrix/NewsCard";
+import NewsCard from "./NewsCard";  // Correction: import de "./NewsCard" au lieu de "./matrix/NewsCard"
 import { InfoIcon } from "./Icons";
 
 /**
