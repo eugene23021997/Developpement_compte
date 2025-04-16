@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { ExternalLinkIcon } from "./Icons";
+import KeywordsList from "./KeywordsList";
 
 /**
  * Composant pour afficher une carte d'actualité avec argumentaires de pertinence
@@ -16,9 +18,8 @@ const NewsCard = ({ news }) => {
     offers,
   } = news;
 
-  // État pour l'expansion de la carte
+  // États pour l'expansion de la carte et la sélection d'offre
   const [expanded, setExpanded] = useState(false);
-  // État pour suivre quelle offre est sélectionnée pour voir son argumentaire
   const [selectedOfferIndex, setSelectedOfferIndex] = useState(null);
 
   // Fonction pour déterminer si une offre a un fort potentiel commercial
@@ -26,11 +27,11 @@ const NewsCard = ({ news }) => {
     return offer.relevanceScore === 3 && !offer.hasOpportunities;
   };
 
-  // Trouver les offres à fort potentiel
+  // Trouver les offres à fort potentiel commercial
   const highPotentialOffers = offers ? offers.filter(isHighPotentialOffer) : [];
   const hasHighPotential = highPotentialOffers.length > 0;
 
-  // Fonction pour basculer l'expansion
+  // Fonction pour basculer l'expansion de la carte
   const toggleExpanded = () => {
     setExpanded(!expanded);
     // Réinitialiser l'offre sélectionnée lors de la fermeture
@@ -45,22 +46,17 @@ const NewsCard = ({ news }) => {
     setSelectedOfferIndex(selectedOfferIndex === index ? null : index);
   };
 
-  // Extraction des mots-clés à partir de la catégorie (maximum 3)
+  // Extraction des mots-clés à partir de la catégorie
   const extractKeywords = (categoryString) => {
     if (!categoryString) return [];
-
     // Diviser la chaîne par virgules et nettoyer les espaces
-    const keywords = categoryString.split(",").map((k) => k.trim());
-
-    // Retourner au maximum 3 mots-clés
-    return keywords.slice(0, 3);
+    return categoryString.split(",").map((k) => k.trim());
   };
-
-  // Obtenir les mots-clés (max 3)
-  const keywords = extractKeywords(newsCategory);
 
   // Générer un argumentaire de pertinence court et précis
   const generateRelevanceArgument = (offer) => {
+    // Les argumentaires spécifiques selon le contenu de l'actualité
+
     // Pour l'actualité sur la fuite de données de Schneider Electric
     if (
       title.includes("fuite de données") ||
@@ -79,12 +75,6 @@ const NewsCard = ({ news }) => {
       ) {
         return '→ Pertinence 3/3: Incident de sécurité = risques RGPD pour Schneider.\n→ Article mentionne: "vol de données" = obligation légale de notification.\n→ Opportunité: accompagnement conformité post-incident.';
       }
-      if (
-        offer.category === "Technology" &&
-        offer.detail.includes("CIO Advisory")
-      ) {
-        return '→ Pertinence 2/3: Incident sur "plateforme de développement" mentionné.\n→ Besoin de revue de la gouvernance IT et sécurité DevOps.\n→ Opportunité: conseil en transformation sécurisée des SI.';
-      }
     }
 
     // Pour les actualités sur les data centers ou l'IA
@@ -92,8 +82,8 @@ const NewsCard = ({ news }) => {
       title.includes("data centers") ||
       title.includes("centres de données") ||
       title.includes("IA") ||
-      keywords.includes("Data Centers") ||
-      keywords.includes("IA")
+      (newsCategory &&
+        (newsCategory.includes("Data Centers") || newsCategory.includes("IA")))
     ) {
       if (
         offer.category === "Technology" &&
@@ -101,101 +91,27 @@ const NewsCard = ({ news }) => {
       ) {
         return '→ Pertinence 3/3: Article mentionne "700M$ pour l\'IA" et "data centers".\n→ Besoin explicite d\'expertise en architectures de données pour l\'IA.\n→ Opportunité: conseil en data platforms pour IA générative.';
       }
-      if (
-        offer.category === "Operations" &&
-        offer.detail.includes("Digital Twin")
-      ) {
-        return '→ Pertinence 2/3: Article cite investissements dans "systèmes de refroidissement".\n→ Les data centers mentionnés nécessitent une gestion énergétique optimisée.\n→ Opportunité: modélisation digitale pour efficience énergétique.';
-      }
     }
 
     // Pour les actualités sur les acquisitions/fusions
     else if (
       title.includes("acquiert") ||
       title.includes("acquisition") ||
-      keywords.includes("Acquisition")
+      (newsCategory && newsCategory.includes("Acquisition"))
     ) {
       if (
         offer.category === "BE Capital" &&
         offer.detail.includes("Capital M&A")
       ) {
-        return "→ Pertinence 3/3: Acquisition Motivair pour 850M$ mentionnée.\n→ Besoin explicite d'intégration dans secteur data centers.\n→ Opportunité: conseil en intégration post-acquisition.";
-      }
-      if (
-        offer.category === "BE Capital" &&
-        offer.detail.includes("PMI & Carve out")
-      ) {
-        return "→ Pertinence 3/3: Article cite \"acquisition\" comme fait central.\n→ Enjeu d'intégration de Motivair (850M$) dans l'écosystème Schneider.\n→ Opportunité: accompagnement PMI spécialisé data centers.";
-      }
-    }
-
-    // Pour les actualités sur la conformité/réglementation
-    else if (
-      title.includes("amende") ||
-      title.includes("entente") ||
-      keywords.includes("Juridique") ||
-      keywords.includes("Conformité")
-    ) {
-      if (
-        offer.category === "Finance & Risk" &&
-        offer.detail.includes("Compliance")
-      ) {
-        return '→ Pertinence 3/3: Article cite "470M€ d\'amendes" pour ententes sur les prix.\n→ Défaillance identifiée des mécanismes anti-trust.\n→ Opportunité: programme de mise en conformité anti-trust.';
-      }
-      if (
-        offer.category === "Finance & Risk" &&
-        offer.detail.includes("Risk Management")
-      ) {
-        return "→ Pertinence 2/3: Sanction financière majeure (470M€) mentionnée.\n→ Besoin implicite de cartographie des risques de non-conformité.\n→ Opportunité: dispositif d'identification et prévention des risques.";
-      }
-    }
-
-    // Pour les actualités financières
-    else if (
-      title.includes("bénéfice") ||
-      title.includes("finance") ||
-      keywords.includes("Finance")
-    ) {
-      if (
-        offer.category === "Finance & Risk" &&
-        offer.detail.includes("Finance Excellence")
-      ) {
-        return '→ Pertinence 2/3: L\'article mentionne "bénéfice record" chez Schneider.\n→ Contexte favorable pour optimiser les processus financiers.\n→ Opportunité: modernisation de la fonction finance.';
-      }
-      if (
-        offer.category === "Finance & Risk" &&
-        offer.detail.includes("Performance Management")
-      ) {
-        return '→ Pertinence 2/3: Article cite "efficacité énergétique" comme driver de performance.\n→ Besoin de pilotage fin des segments à forte croissance.\n→ Opportunité: redéfinition des KPIs et tableaux de bord.';
-      }
-    }
-
-    // Pour les actualités sur l'économie circulaire/développement durable
-    else if (
-      title.includes("économie circulaire") ||
-      title.includes("durable") ||
-      keywords.includes("Développement durable") ||
-      keywords.includes("Économie circulaire")
-    ) {
-      if (
-        offer.category === "Operations" &&
-        offer.detail.includes("Manufacturing")
-      ) {
-        return "→ Pertinence 3/3: Article centré sur l'économie circulaire des équipements.\n→ Mention explicite de \"réparation et maintenance\" à Grenoble.\n→ Opportunité: transformation des processus industriels vers l'économie circulaire.";
-      }
-      if (
-        offer.category === "People & Strategy" &&
-        offer.detail.includes("Business Strategy")
-      ) {
-        return '→ Pertinence 2/3: Article évoque "économie circulaire" comme nouvelle orientation.\n→ Transformation du modèle d\'affaires implicite.\n→ Opportunité: conseil en stratégie économie de fonctionnalité.';
+        return "→ Pertinence 3/3: Acquisition mentionnée.\n→ Besoin explicite d'intégration dans secteur concerné.\n→ Opportunité: conseil en intégration post-acquisition.";
       }
     }
 
     // Argumentaires par défaut basés sur le niveau de pertinence
     if (offer.relevanceScore === 3) {
-      return `→ Pertinence 3/3: L'article traite directement de ${keywords[0]}.\n→ Mots-clés liés à notre offre ${offer.detail} présents dans l'actualité.\n→ Opportunité: proposition directe sur cette problématique prioritaire.`;
+      return `→ Pertinence 3/3: L'article traite directement de l'offre mentionnée.\n→ Mots-clés liés à notre offre ${offer.detail} présents dans l'actualité.\n→ Opportunité: proposition directe sur cette problématique prioritaire.`;
     } else if (offer.relevanceScore === 2) {
-      return `→ Pertinence 2/3: L'article aborde indirectement notre domaine d'expertise.\n→ Lien identifié entre ${keywords[0]} et notre offre ${offer.detail}.\n→ Opportunité: approche complémentaire aux enjeux principaux.`;
+      return `→ Pertinence 2/3: L'article aborde indirectement notre domaine d'expertise.\n→ Lien identifié entre l'actualité et notre offre ${offer.detail}.\n→ Opportunité: approche complémentaire aux enjeux principaux.`;
     } else {
       return `→ Pertinence 1/3: Thématique périphérique à notre expertise.\n→ Connexion contextuelle possible avec notre offre ${offer.detail}.\n→ Opportunité: point d'entrée pour une discussion plus large.`;
     }
@@ -214,7 +130,7 @@ const NewsCard = ({ news }) => {
       }}
     >
       <div className="premium-news-card-content">
-        {/* En-tête de la carte - Épuré */}
+        {/* En-tête de la carte - Date et indicateur de potentiel */}
         <div
           className="premium-news-meta"
           style={{
@@ -252,66 +168,16 @@ const NewsCard = ({ news }) => {
               onClick={(e) => e.stopPropagation()} // Empêcher l'expansion au clic sur le lien
             >
               {title}
-              <svg
-                className="premium-external-link-icon"
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M15 3h6v6"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M10 14L21 3"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              <ExternalLinkIcon className="premium-external-link-icon" />
             </a>
           ) : (
             title
           )}
         </h3>
 
-        {/* Affichage des mots-clés (max 3) */}
-        <div
-          style={{
-            display: "flex",
-            gap: "8px",
-            flexWrap: "wrap",
-            marginTop: "12px",
-          }}
-        >
-          {keywords.map((keyword, index) => (
-            <span
-              key={index}
-              className="premium-badge"
-              style={{
-                fontSize: "12px",
-                padding: "2px 8px",
-                backgroundColor: "rgba(59, 130, 246, 0.1)", // bleu clair
-                color: "#3b82f6",
-                borderRadius: "20px",
-              }}
-            >
-              {keyword}
-            </span>
-          ))}
+        {/* Affichage des mots-clés */}
+        <div style={{ marginTop: "12px" }}>
+          <KeywordsList keywords={newsCategory} />
         </div>
 
         {/* Description courte (visible uniquement en mode expanded) */}

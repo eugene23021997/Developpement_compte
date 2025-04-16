@@ -1,6 +1,7 @@
 import React from "react";
 import NewsCard from "./NewsCard";
 import LoadingSpinner from "./LoadingSpinner";
+import { WarningIcon } from "./Icons";
 
 /**
  * Composant pour afficher l'onglet Actualités contenant les actualités et leur pertinence
@@ -44,7 +45,6 @@ const MatrixTabContent = ({
 
     // Découper la chaîne en composants
     const parts = dateString.split(" ");
-
     if (parts.length !== 3) {
       console.error(`Format de date non reconnu: ${dateString}`);
       return new Date(0); // Date par défaut en cas d'erreur
@@ -62,17 +62,17 @@ const MatrixTabContent = ({
     return new Date(year, month, day);
   };
 
-  // Trier les actualités par date en ordre chronologique inversé (des plus récentes aux plus anciennes)
+  // Trier les actualités par date (des plus récentes aux plus anciennes)
   const sortedNews = [...newsArray].sort((a, b) => {
     // Utiliser notre fonction de parsing personnalisée pour traiter les dates
-    const dateA = parseCustomDate(a.newsDate);
-    const dateB = parseCustomDate(b.newsDate);
-
-    return dateB - dateA; // Ordre chronologique inversé (plus récentes en premier)
+    const dateA = a.dateObj || parseCustomDate(a.newsDate);
+    const dateB = b.dateObj || parseCustomDate(b.newsDate);
+    return dateB - dateA; // Ordre chronologique inversé
   });
 
   return (
     <>
+      {/* Afficher un overlay de chargement pendant la mise à jour des flux RSS */}
       {isLoadingRss && (
         <div className="premium-loading-overlay">
           <LoadingSpinner size="large" color="primary" />
@@ -80,6 +80,7 @@ const MatrixTabContent = ({
         </div>
       )}
 
+      {/* Grille d'actualités */}
       <div className="premium-news-grid">
         {sortedNews.length > 0 ? (
           sortedNews.map((news, index) => <NewsCard key={index} news={news} />)
@@ -138,35 +139,7 @@ const MatrixTabContent = ({
               <div key={index} className="premium-warning-item">
                 <div className="premium-warning-content">
                   <div className="premium-warning-icon">
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      <path
-                        d="M12 9v4"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      <path
-                        d="M12 17h.01"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
+                    <WarningIcon />
                   </div>
                   <div className="premium-warning-text">
                     <strong>{offer}</strong>

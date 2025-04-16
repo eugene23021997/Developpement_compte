@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { dataService } from "./services/dataService";
 import { rssFeedService } from "./services/rssFeedService";
-import MatrixTabContent from "./components/matrix/MatrixTabContent";
-import ServiceLineTabContent from "./components/servicelines/ServiceLineTabContent";
-import ContactTabContent from "./components/contacts/ContactTabContent";
-import LoadingSpinner from "./components/common/LoadingSpinner";
+import MatrixTabContent from "./components/MatrixTabContent";
+import ServiceLineTabContent from "./components/ServiceLineTabContent";
+import ContactTabContent from "./components/ContactTabContent";
+import LoadingSpinner from "./components/LoadingSpinner";
 import "./styles/main.css";
 
 /**

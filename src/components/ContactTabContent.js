@@ -1,17 +1,18 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
-import { contactExtractionService } from "../services/contactExtractionService";
-import { excelImportService } from "../services/excelImportService";
+import { contactService } from "../services/contactService";
 import ContactList from "./ContactList";
 import LoadingSpinner from "./LoadingSpinner";
 
 /**
  * Composant de gestion des contacts pour l'onglet Contacts
+ * Permet l'extraction, l'import et l'analyse des contacts
  * @param {Object} props - Propriétés du composant
  * @param {Array} props.combinedRelevanceMatrix - Matrice combinée de pertinence des actualités
  * @param {Object} props.data - Données de l'application
  * @param {boolean} props.isLoadingRss - Indicateur de chargement des flux RSS
+ * @returns {JSX.Element} Onglet de gestion des contacts
  */
-const ContactsManagementTab = ({ combinedRelevanceMatrix, data, isLoadingRss }) => {
+const ContactTabContent = ({ combinedRelevanceMatrix, data, isLoadingRss }) => {
   // États de gestion des contacts
   const [contacts, setContacts] = useState([]);
   const [excelContacts, setExcelContacts] = useState([]);
@@ -30,21 +31,28 @@ const ContactsManagementTab = ({ combinedRelevanceMatrix, data, isLoadingRss }) 
       setLoading(true);
       // Extraire les contacts des actualités Schneider Electric
       const newsItems = [
-        ...data.schneiderNews, 
-        ...combinedRelevanceMatrix.map(item => ({
+        ...data.schneiderNews,
+        ...combinedRelevanceMatrix.map((item) => ({
           title: item.news,
-          description: item.newsDescription || '',
+          description: item.newsDescription || "",
           date: item.newsDate,
-          link: item.newsLink || ''
-        }))
+          link: item.newsLink || "",
+        })),
       ];
 
-      const extractedContacts = contactExtractionService.extractContactsFromNews(newsItems);
+      const extractedContacts =
+        contactService.extractContactsFromNews(newsItems);
 
       // Identifier les rôles manquants
-      const roles = excelImportService.identifyRolesInNews(combinedRelevanceMatrix);
-      const rolesToContacts = excelImportService.matchContactsToRoles(extractedContacts, roles);
-      const missingRolesList = excelImportService.identifyMissingRoles(roles, rolesToContacts);
+      const roles = contactService.identifyRolesInNews(combinedRelevanceMatrix);
+      const rolesToContacts = contactService.matchContactsToRoles(
+        extractedContacts,
+        roles
+      );
+      const missingRolesList = contactService.identifyMissingRoles(
+        roles,
+        rolesToContacts
+      );
 
       setContacts(extractedContacts);
       setMissingRoles(missingRolesList);
@@ -56,54 +64,70 @@ const ContactsManagementTab = ({ combinedRelevanceMatrix, data, isLoadingRss }) 
   }, [data, combinedRelevanceMatrix]);
 
   // Importer des contacts depuis un fichier Excel
-  const importExcelContacts = useCallback(async (file) => {
-    setImportLoading(true);
-    try {
-      // Importer les contacts depuis le fichier Excel
-      const importedContacts = await excelImportService.importContacts(file);
+  const importExcelContacts = useCallback(
+    async (file) => {
+      setImportLoading(true);
+      try {
+        // Importer les contacts depuis le fichier Excel
+        const importedContacts = await contactService.importContacts(file);
 
-      // Analyser la pertinence des contacts importés
-      const relevanceAnalysis = excelImportService.analyzeContactRelevance(
-        importedContacts, 
-        combinedRelevanceMatrix
-      );
+        // Analyser la pertinence des contacts importés
+        const relevanceAnalysis = contactService.analyzeContactRelevance(
+          importedContacts,
+          combinedRelevanceMatrix
+        );
 
-      setExcelContacts(relevanceAnalysis);
+        setExcelContacts(relevanceAnalysis);
 
-      // Identifier les rôles manquants
-      const roles = excelImportService.identifyRolesInNews(combinedRelevanceMatrix);
-      const rolesToContacts = excelImportService.matchContactsToRoles(relevanceAnalysis, roles);
-      const missingRolesList = excelImportService.identifyMissingRoles(roles, rolesToContacts);
+        // Identifier les rôles manquants
+        const roles = contactService.identifyRolesInNews(
+          combinedRelevanceMatrix
+        );
+        const rolesToContacts = contactService.matchContactsToRoles(
+          relevanceAnalysis,
+          roles
+        );
+        const missingRolesList = contactService.identifyMissingRoles(
+          roles,
+          rolesToContacts
+        );
 
-      setMissingRoles(missingRolesList);
-      setMissingRoleContacts(
-        relevanceAnalysis.filter(contact => 
-          missingRolesList.some(role => 
-            contact.role.toLowerCase().includes(role.toLowerCase())
+        setMissingRoles(missingRolesList);
+        setMissingRoleContacts(
+          relevanceAnalysis.filter((contact) =>
+            missingRolesList.some((role) =>
+              contact.role.toLowerCase().includes(role.toLowerCase())
+            )
           )
-        )
-      );
+        );
 
-      // Afficher un message de succès
-      alert(`${importedContacts.length} contacts ont été importés avec succès!`);
-    } catch (error) {
-      console.error("Erreur lors de l'importation des contacts:", error);
-      alert(`Erreur lors de l'importation des contacts: ${error.message}`);
-    } finally {
-      setImportLoading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+        // Afficher un message de succès
+        alert(
+          `${importedContacts.length} contacts ont été importés avec succès!`
+        );
+      } catch (error) {
+        console.error("Erreur lors de l'importation des contacts:", error);
+        alert(`Erreur lors de l'importation des contacts: ${error.message}`);
+      } finally {
+        setImportLoading(false);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
       }
-    }
-  }, [combinedRelevanceMatrix]);
+    },
+    [combinedRelevanceMatrix]
+  );
 
   // Gestion de la sélection de fichier
-  const handleFileSelect = useCallback((event) => {
-    const file = event.target.files[0];
-    if (file) {
-      importExcelContacts(file.name);
-    }
-  }, [importExcelContacts]);
+  const handleFileSelect = useCallback(
+    (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        importExcelContacts(file.name);
+      }
+    },
+    [importExcelContacts]
+  );
 
   // Charger les contacts extraits au premier rendu
   useEffect(() => {
@@ -115,10 +139,10 @@ const ContactsManagementTab = ({ combinedRelevanceMatrix, data, isLoadingRss }) 
       {/* En-tête */}
       <div className="contacts-header">
         <h2 className="contacts-title">Contacts Schneider Electric</h2>
-        
+
         <div className="contacts-actions">
           {/* Bouton d'import des contacts */}
-          <button 
+          <button
             className="import-button"
             onClick={() => fileInputRef.current.click()}
             disabled={importLoading}
@@ -131,7 +155,7 @@ const ContactsManagementTab = ({ combinedRelevanceMatrix, data, isLoadingRss }) 
             <input
               type="file"
               ref={fileInputRef}
-              style={{ display: 'none' }}
+              style={{ display: "none" }}
               accept=".xlsx,.xls,.csv"
               onChange={handleFileSelect}
             />
@@ -141,22 +165,28 @@ const ContactsManagementTab = ({ combinedRelevanceMatrix, data, isLoadingRss }) 
 
       {/* Onglets */}
       <div className="contacts-tabs">
-        <button 
-          className={`contacts-tab-button ${activeTab === 'extracted' ? 'active' : ''}`}
-          onClick={() => setActiveTab('extracted')}
+        <button
+          className={`contacts-tab-button ${
+            activeTab === "extracted" ? "active" : ""
+          }`}
+          onClick={() => setActiveTab("extracted")}
         >
           Contacts extraits
         </button>
-        <button 
-          className={`contacts-tab-button ${activeTab === 'imported' ? 'active' : ''}`}
-          onClick={() => setActiveTab('imported')}
+        <button
+          className={`contacts-tab-button ${
+            activeTab === "imported" ? "active" : ""
+          }`}
+          onClick={() => setActiveTab("imported")}
         >
           Contacts importés
         </button>
         {missingRoles.length > 0 && (
-          <button 
-            className={`contacts-tab-button ${activeTab === 'missing' ? 'active' : ''}`}
-            onClick={() => setActiveTab('missing')}
+          <button
+            className={`contacts-tab-button ${
+              activeTab === "missing" ? "active" : ""
+            }`}
+            onClick={() => setActiveTab("missing")}
           >
             Rôles manquants
           </button>
@@ -174,26 +204,24 @@ const ContactsManagementTab = ({ combinedRelevanceMatrix, data, isLoadingRss }) 
       {/* Contenu des onglets */}
       {!loading && !isLoadingRss && (
         <>
-          {activeTab === 'extracted' && (
-            <ContactList 
-              contacts={contacts} 
-              isLoadingRss={isLoadingRss} 
-            />
+          {activeTab === "extracted" && (
+            <ContactList contacts={contacts} isLoadingRss={isLoadingRss} />
           )}
-          
-          {activeTab === 'imported' && (
-            <ContactList 
-              contacts={excelContacts} 
-              isLoadingRss={isLoadingRss} 
+
+          {activeTab === "imported" && (
+            <ContactList
+              contacts={excelContacts}
+              isLoadingRss={isLoadingRss}
+              isImportedList={true}
             />
           )}
 
-          {activeTab === 'missing' && missingRoles.length > 0 && (
+          {activeTab === "missing" && missingRoles.length > 0 && (
             <div className="missing-roles-container">
               <div className="missing-roles-info">
                 <p>
-                  Les rôles suivants ont été identifiés dans les actualités mais ne correspondent 
-                  à aucun contact dans nos bases de données.
+                  Les rôles suivants ont été identifiés dans les actualités mais
+                  ne correspondent à aucun contact dans nos bases de données.
                 </p>
               </div>
               <div className="missing-roles-list">
@@ -202,16 +230,23 @@ const ContactsManagementTab = ({ combinedRelevanceMatrix, data, isLoadingRss }) 
                     <div className="missing-role-header">
                       <h3>{role}</h3>
                       <div className="potential-matches-badge">
-                        {missingRoleContacts.filter(contact => 
-                          contact.role.toLowerCase().includes(role.toLowerCase())
-                        ).length} correspondances potentielles
+                        {
+                          missingRoleContacts.filter((contact) =>
+                            contact.role
+                              .toLowerCase()
+                              .includes(role.toLowerCase())
+                          ).length
+                        }{" "}
+                        correspondances potentielles
                       </div>
                     </div>
-                    
+
                     <div className="potential-contacts">
                       {missingRoleContacts
-                        .filter(contact => 
-                          contact.role.toLowerCase().includes(role.toLowerCase())
+                        .filter((contact) =>
+                          contact.role
+                            .toLowerCase()
+                            .includes(role.toLowerCase())
                         )
                         .map((contact, idx) => (
                           <div key={idx} className="potential-contact-card">
@@ -248,4 +283,4 @@ const ContactsManagementTab = ({ combinedRelevanceMatrix, data, isLoadingRss }) 
   );
 };
 
-export default ContactsManagementTab;
+export default ContactTabContent;

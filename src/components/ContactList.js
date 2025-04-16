@@ -1,12 +1,16 @@
 import React, { useState, useMemo } from "react";
+import LoadingSpinner from "./LoadingSpinner";
 
 /**
  * Composant pour afficher une liste de contacts avec filtres et actions
  * @param {Object} props - Propriétés du composant
  * @param {Array} props.contacts - Liste des contacts à afficher
  * @param {boolean} props.isLoadingRss - Indicateur de chargement des flux RSS
+ * @param {boolean} props.isImportedList - Indique si la liste provient d'un import Excel
+ * @returns {JSX.Element} Liste de contacts filtrables et exportables
  */
-const ContactList = ({ contacts, isLoadingRss }) => {
+const ContactList = ({ contacts, isLoadingRss, isImportedList = false }) => {
+  // États pour le filtrage et la sélection
   const [confidenceFilter, setConfidenceFilter] = useState(0.5);
   const [roleFilter, setRoleFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
@@ -44,16 +48,20 @@ const ContactList = ({ contacts, isLoadingRss }) => {
 
       // Filtre par recherche
       const searchText = searchTerm.toLowerCase();
-      const matchesSearch = 
+      const matchesSearch =
         !searchTerm ||
-        (contact.fullName && contact.fullName.toLowerCase().includes(searchText)) ||
+        (contact.fullName &&
+          contact.fullName.toLowerCase().includes(searchText)) ||
         (contact.name && contact.name.toLowerCase().includes(searchText)) ||
         contact.role.toLowerCase().includes(searchText) ||
-        (contact.department && contact.department.toLowerCase().includes(searchText)) ||
+        (contact.department &&
+          contact.department.toLowerCase().includes(searchText)) ||
         (contact.company && contact.company.toLowerCase().includes(searchText));
 
       // Filtre "sélectionnés uniquement"
-      const isSelected = selectedContacts.includes(contact.name || contact.fullName);
+      const isSelected = selectedContacts.includes(
+        contact.name || contact.fullName
+      );
       if (showOnlySelected && !isSelected) {
         return false;
       }
@@ -69,8 +77,8 @@ const ContactList = ({ contacts, isLoadingRss }) => {
     showOnlySelected,
   ]);
 
- // Sélection/désélection d'un contact
-const toggleContactSelection = (contactName) => {
+  // Sélection/désélection d'un contact
+  const toggleContactSelection = (contactName) => {
     const name = contactName.name || contactName.fullName || contactName;
     if (selectedContacts.includes(name)) {
       setSelectedContacts(
@@ -96,8 +104,8 @@ const toggleContactSelection = (contactName) => {
   const exportContacts = () => {
     // Filtrer les contacts à exporter
     const contactsToExport = filteredContacts.filter(
-      (contact) => 
-        selectedContacts.includes(contact.name || contact.fullName) || 
+      (contact) =>
+        selectedContacts.includes(contact.name || contact.fullName) ||
         !showOnlySelected
     );
 
@@ -115,7 +123,7 @@ const toggleContactSelection = (contactName) => {
       "Département",
       "Email",
       "Téléphone",
-      "Sources"
+      "Sources",
     ];
 
     // Créer les lignes CSV
@@ -127,7 +135,7 @@ const toggleContactSelection = (contactName) => {
       contact.department || "",
       contact.email || "",
       contact.phone || "",
-      (contact.sources || []).map((s) => s.title).join(" | ")
+      (contact.sources || []).map((s) => s.title).join(" | "),
     ]);
 
     // Assembler le contenu CSV
@@ -162,8 +170,8 @@ const toggleContactSelection = (contactName) => {
   // Fonction de troncature de texte
   const truncateText = (text, maxLength = 60) => {
     if (!text) return "";
-    return text.length > maxLength 
-      ? `${text.substring(0, maxLength)}...` 
+    return text.length > maxLength
+      ? `${text.substring(0, maxLength)}...`
       : text;
   };
 
@@ -171,14 +179,14 @@ const toggleContactSelection = (contactName) => {
     <>
       {isLoadingRss && (
         <div className="premium-loading-overlay">
-          <div className="premium-spinner"></div>
+          <LoadingSpinner size="large" />
           <p>Mise à jour des actualités et extraction des contacts...</p>
         </div>
       )}
 
       <div className="premium-contacts-header">
         <h2 className="premium-section-title">
-          Contacts détectés
+          Contacts {isImportedList ? "importés" : "détectés"}
           {contacts.length > 0 && (
             <span className="contacts-count">({contacts.length})</span>
           )}
@@ -344,15 +352,17 @@ const toggleContactSelection = (contactName) => {
               <div
                 key={`${contact.name || contact.fullName}-${index}`}
                 className={`premium-contact-card ${
-                  selectedContacts.includes(contact.name || contact.fullName) 
-                    ? "selected" 
+                  selectedContacts.includes(contact.name || contact.fullName)
+                    ? "selected"
                     : ""
                 }`}
               >
                 <div className="premium-contact-checkbox">
                   <input
                     type="checkbox"
-                    checked={selectedContacts.includes(contact.name || contact.fullName)}
+                    checked={selectedContacts.includes(
+                      contact.name || contact.fullName
+                    )}
                     onChange={() => toggleContactSelection(contact)}
                     id={`contact-${index}`}
                     className="premium-checkbox"
@@ -473,12 +483,12 @@ const toggleContactSelection = (contactName) => {
             </svg>
           </div>
           <div className="empty-message">
-            {contacts.length === 0 
-              ? "Aucun contact n'a été détecté." 
+            {contacts.length === 0
+              ? "Aucun contact n'a été détecté."
               : "Aucun contact ne correspond aux critères de filtrage actuels."}
           </div>
-          {contacts.length === 0 && (
-            <button 
+          {contacts.length > 0 && (
+            <button
               className="reset-button"
               onClick={() => {
                 setConfidenceFilter(0);
