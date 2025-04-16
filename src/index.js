@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom";
 import App from "./App";
+// Modification du chemin d'import pour les styles
 import "./styles/main.css";
 
 /**
