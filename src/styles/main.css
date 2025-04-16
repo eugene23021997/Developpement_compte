@@ -108,16 +108,12 @@ body {
   background-color: var(--background);
   background-image: radial-gradient(
       at 0% 0%,
-      rgba(var(--accent), 0.03) 0px,
+      rgba(79, 70, 229, 0.03) 0px,
       transparent 50%
     ),
-    radial-gradient(at 100% 0%, rgba(var(--primary), 0.03) 0px, transparent 50%),
-    radial-gradient(
-      at 100% 100%,
-      rgba(var(--success), 0.03) 0px,
-      transparent 50%
-    ),
-    radial-gradient(at 0% 100%, rgba(var(--warning), 0.03) 0px, transparent 50%);
+    radial-gradient(at 100% 0%, rgba(0, 113, 243, 0.03) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(5, 150, 105, 0.03) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(245, 158, 11, 0.03) 0px, transparent 50%);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -723,14 +719,16 @@ svg {
 }
 
 .premium-clear-search {
+  margin-left: 8px;
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 20px;
   height: 20px;
-  color: var(--text-secondary);
-  background: none;
-  border: none;
   border-radius: var(--border-radius-full);
   transition: all var(--transition-fast);
 }
@@ -1579,6 +1577,7 @@ svg {
     box-shadow: 0 0 0 0 rgba(0, 113, 243, 0);
   }
 }
+
 /* Styles supplémentaires pour le flux RSS */
 
 /* Badge RSS */
@@ -1627,14 +1626,19 @@ svg {
 }
 
 .premium-external-link-icon {
-  margin-left: 6px;
-  opacity: 0.6;
+  margin-left: 2px; /* Réduit la marge à gauche */
+  width: 20px; /* Diminue la taille de l'icône */
+  height: 20px; /* Diminue la taille de l'icône */
+  opacity: 0.4; /* Rend l'icône plus discrète */
   transition: opacity var(--transition-fast), transform var(--transition-fast);
+  vertical-align: super; /* Place l'icône légèrement au-dessus de la ligne de base */
+  position: relative;
+  top: -1px; /* Ajuste légèrement la position verticale */
 }
 
 .premium-news-link:hover .premium-external-link-icon {
-  opacity: 1;
-  transform: translateX(2px);
+  opacity: 0.6; /* Légèrement plus visible au survol, mais toujours discrète */
+  transform: translateX(1px); /* Animation subtile au survol */
 }
 
 /* Description de l'actualité */
@@ -1675,15 +1679,6 @@ svg {
   }
   to {
     opacity: 1;
-  }
-}
-
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
   }
 }
 
@@ -1837,6 +1832,7 @@ svg {
   font-size: 12px;
   color: var(--text-tertiary);
 }
+
 /* Styles pour l'onglet Contacts */
 
 /* En-tête de la section contacts */
@@ -2144,6 +2140,7 @@ svg {
     grid-column: 2;
   }
 }
+
 /* Styles spécifiques pour l'onglet Contact */
 
 /* En-tête et contrôles */
@@ -2166,7 +2163,8 @@ svg {
   gap: 12px;
 }
 
-.import-button, .export-button {
+.import-button,
+.export-button {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2477,56 +2475,6 @@ svg {
   border-radius: 20px;
 }
 
-/* État vide */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 64px 0;
-  text-align: center;
-}
-
-.empty-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 80px;
-  height: 80px;
-  color: var(--text-tertiary);
-  background-color: rgba(0, 0, 0, 0.03);
-  border-radius: 50%;
-  margin-bottom: 20px;
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.03);
-}
-
-.empty-message {
-  font-size: 16px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  margin-bottom: 16px;
-}
-
-.reset-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--glass-bg);
-  color: var(--primary);
-  border: 1px solid var(--primary);
-  border-radius: var(--border-radius-sm);
-  padding: 8px 16px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.reset-button:hover {
-  background-color: rgba(0, 113, 243, 0.05);
-  box-shadow: var(--shadow-sm);
-}
-
 /* Rôles manquants */
 .missing-roles-container {
   background-color: var(--glass-bg);
@@ -2630,67 +2578,201 @@ svg {
   color: var(--text-secondary);
 }
 
-/* Overlay de chargement */
-.premium-loading-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
+/* Styles à ajouter à src/styles/main.css */
+
+/* Container de mots-clés */
+.premium-keywords-container {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
+
+/* Style des badges de mots-clés */
+.premium-keyword-badge {
+  display: inline-flex;
   align-items: center;
-  gap: 16px;
-  z-index: 1000;
-  animation: fadeIn 0.3s ease-out;
+  justify-content: center;
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  white-space: nowrap;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  transition: all 0.2s ease;
+}
+
+/* Hover effet */
+.premium-keyword-badge:hover {
+  background-color: rgba(59, 130, 246, 0.15);
+  transform: translateY(-1px);
+}
+
+/* Style pour l'indicateur "plus" */
+.premium-keyword-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(156, 163, 175, 0.1);
+  color: var(--text-tertiary);
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  white-space: nowrap;
+  border: 1px solid rgba(156, 163, 175, 0.2);
+}
+
+/* Pour les mots-clés avec différentes couleurs selon la catégorie */
+.premium-keyword-badge.tech {
+  background-color: rgba(6, 182, 212, 0.1);
+  color: #06b6d4;
+  border-color: rgba(6, 182, 212, 0.2);
+}
+
+.premium-keyword-badge.finance {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.premium-keyword-badge.security {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.premium-keyword-badge.data {
+  background-color: rgba(139, 92, 246, 0.1);
+  color: #8b5cf6;
+  border-color: rgba(139, 92, 246, 0.2);
+}
+
+.premium-keyword-badge.ai {
+  background-color: rgba(236, 72, 153, 0.1);
+  color: #ec4899;
+  border-color: rgba(236, 72, 153, 0.2);
+}
+/* Styles de base pour les badges de mots-clés */
+.premium-keywords-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.premium-keyword-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 16px;
+  color: #4b5563;
+  background-color: rgba(203, 213, 225, 0.3);
+  border: 1px solid rgba(203, 213, 225, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: all 0.2s ease;
+}
+
+.premium-keyword-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+}
+
+/* Styles spécifiques par catégorie */
+.premium-keyword-badge.ai {
+  color: #7c3aed;
+  background-color: rgba(124, 58, 237, 0.1);
+  border-color: rgba(124, 58, 237, 0.3);
+}
+
+.premium-keyword-badge.data {
+  color: #2563eb;
+  background-color: rgba(37, 99, 235, 0.1);
+  border-color: rgba(37, 99, 235, 0.3);
+}
+
+.premium-keyword-badge.security {
+  color: #dc2626;
+  background-color: rgba(220, 38, 38, 0.1);
+  border-color: rgba(220, 38, 38, 0.3);
+}
+
+.premium-keyword-badge.finance {
+  color: #059669;
+  background-color: rgba(5, 150, 105, 0.1);
+  border-color: rgba(5, 150, 105, 0.3);
+}
+
+.premium-keyword-badge.tech {
+  color: #0891b2;
+  background-color: rgba(8, 145, 178, 0.1);
+  border-color: rgba(8, 145, 178, 0.3);
+}
+
+.premium-keyword-badge.investment {
+  color: #9333ea;
+  background-color: rgba(147, 51, 234, 0.1);
+  border-color: rgba(147, 51, 234, 0.3);
+}
+
+.premium-keyword-badge.hr {
+  color: #0369a1;
+  background-color: rgba(3, 105, 161, 0.1);
+  border-color: rgba(3, 105, 161, 0.3);
+}
+
+.premium-keyword-badge.sustainability {
+  color: #16a34a;
+  background-color: rgba(22, 163, 74, 0.1);
+  border-color: rgba(22, 163, 74, 0.3);
+}
+
+.premium-keyword-badge.default {
+  color: #6b7280;
+  background-color: rgba(107, 114, 128, 0.1);
+  border-color: rgba(107, 114, 128, 0.3);
+}
+
+/* Styles pour la légende des mots-clés */
+.premium-keywords-legend {
+  position: absolute;
+  z-index: 10;
+  right: 10px;
+  top: 40px;
+  width: calc(100% - 20px);
+  max-width: 500px;
+  padding: 12px;
+  background-color: rgba(255, 255, 255, 0.95);
+  border-radius: 8px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.premium-legend-toggle {
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.premium-legend-toggle:hover {
+  opacity: 1;
+  background-color: rgba(0, 0, 0, 0.05);
 }
 
 @keyframes fadeIn {
   from {
     opacity: 0;
+    transform: translateY(-5px);
   }
   to {
     opacity: 1;
-  }
-}
-
-/* Responsive */
-@media (max-width: 992px) {
-  .contacts-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
-  }
-  
-  .contacts-actions {
-    width: 100%;
-  }
-  
-  .filter-group {
-    flex-direction: column;
-  }
-  
-  .potential-contacts {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 768px) {
-  .contacts-table th,
-  .contacts-table td {
-    padding: 12px 8px;
-    font-size: 13px;
-  }
-  
-  .contacts-table-container {
-    overflow-x: auto;
-  }
-  
-  .contacts-table {
-    min-width: 800px;
+    transform: translateY(0);
   }
 }
