@@ -53,6 +53,32 @@ const NewsCard = ({ news }) => {
     return categoryString.split(",").map((k) => k.trim());
   };
 
+  // Assigner une classe CSS aux mots-clés selon leur contenu
+  const getCategoryClass = (keyword) => {
+    const lowerKeyword = keyword.toLowerCase();
+    if (lowerKeyword.includes('ia') || lowerKeyword.includes('intelligence artificielle') || 
+        lowerKeyword.includes('ai') || lowerKeyword.includes('machine learning')) {
+      return 'ai';
+    }
+    if (lowerKeyword.includes('data') || lowerKeyword.includes('données') || 
+        lowerKeyword.includes('analytics')) {
+      return 'data';
+    }
+    if (lowerKeyword.includes('cyber') || lowerKeyword.includes('sécurité') || 
+        lowerKeyword.includes('security')) {
+      return 'security';
+    }
+    if (lowerKeyword.includes('finance') || lowerKeyword.includes('financial') || 
+        lowerKeyword.includes('risk')) {
+      return 'finance';
+    }
+    if (lowerKeyword.includes('tech') || lowerKeyword.includes('digital') || 
+        lowerKeyword.includes('cloud')) {
+      return 'tech';
+    }
+    return '';
+  };
+
   // Générer un argumentaire de pertinence court et précis
   const generateRelevanceArgument = (offer) => {
     // Les argumentaires spécifiques selon le contenu de l'actualité
@@ -175,10 +201,21 @@ const NewsCard = ({ news }) => {
           )}
         </h3>
 
-        {/* Affichage des mots-clés */}
-        <div style={{ marginTop: "12px" }}>
-          <KeywordsList keywords={newsCategory} />
-        </div>
+        {/* Affichage des mots-clés avec les nouveaux badges */}
+        {newsCategory && (
+          <div style={{ marginTop: "12px" }}>
+            <div className="premium-keywords-container">
+              {extractKeywords(newsCategory).map((keyword, idx) => (
+                <span 
+                  key={idx} 
+                  className={`premium-keyword-badge ${getCategoryClass(keyword)}`}
+                >
+                  {keyword}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Description courte (visible uniquement en mode expanded) */}
         {newsDescription && expanded && (
