@@ -181,6 +181,15 @@ const KNOWN_ENTITIES = [
   "industrial automation",
   "staying ahead",
   "curve",
+  "Business Applications",
+  "Data",
+  "Analytics and AI",
+  "Operations",
+  "People & Strategy",
+  "Demand Management",
+  "The future in motion",
+  "Flexible",
+  "agile operations",
 ];
 
 /**
@@ -351,7 +360,11 @@ function extractWithPattern(
     const role = match[roleIndex].trim();
 
     // Vérifier si ce n'est pas une entité connue
-    if (KNOWN_ENTITIES.some((entity) => name.includes(entity))) {
+    if (
+      KNOWN_ENTITIES.some(
+        (entity) => name.includes(entity) || entity.includes(name)
+      )
+    ) {
       continue;
     }
 
@@ -390,13 +403,17 @@ function extractTitlesOnly(pattern, text, contacts, processedNames, company) {
     }
 
     // Vérifier si ce n'est pas une entité connue
-    if (KNOWN_ENTITIES.some((entity) => role.includes(entity))) {
+    if (
+      KNOWN_ENTITIES.some(
+        (entity) => role.includes(entity) || entity.includes(name)
+      )
+    ) {
       continue;
     }
 
     // Ajouter comme contact avec nom manquant
     contacts.push({
-      name: "Nom non identifié",
+      name: "-", // Utiliser un tiret quand le nom n'est pas identifié
       role: role,
       confidenceScore: 0.6,
       company,

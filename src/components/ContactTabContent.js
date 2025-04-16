@@ -4,31 +4,27 @@ import LoadingSpinner from "./LoadingSpinner";
 
 /**
  * Composant pour afficher les contacts extraits des actualités
- * @param {Object} props - Les propriétés du composant
- * @param {Array} props.combinedRelevanceMatrix - Matrice de pertinence combinée
- * @param {Object} props.data - Les données de l'application
- * @param {boolean} props.isLoadingRss - Indicateur de chargement des RSS
- * @returns {JSX.Element} Contenu de l'onglet Contacts
+ * Format épuré pour usage commercial et reporting
  */
 const ContactTabContent = ({ combinedRelevanceMatrix, data, isLoadingRss }) => {
-  // État pour les contacts et le filtrage
+  // États
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState("all");
   const [availableRoles, setAvailableRoles] = useState([]);
+  const [selectedContacts, setSelectedContacts] = useState([]);
 
-  // Extraction des contacts à partir des actualités au chargement
+  // Extraction des contacts
   useEffect(() => {
     const extractContacts = async () => {
       setLoading(true);
       try {
-        // Convertir les actualités de la matrice en format adapté pour l'extraction
+        // Préparer les actualités pour l'extraction
         const allNews = [];
         const processedNews = new Set();
 
         combinedRelevanceMatrix.forEach(item => {
-          // Éviter les doublons
           if (!processedNews.has(item.news)) {
             processedNews.add(item.news);
             
@@ -42,15 +38,14 @@ const ContactTabContent = ({ combinedRelevanceMatrix, data, isLoadingRss }) => {
           }
         });
 
-        // Utiliser le service d'extraction de contacts
+        // Extraire les contacts
         const extractedContacts = contactExtractionService.extractContactsFromNews(allNews, "Schneider Electric");
         setContacts(extractedContacts);
 
-        // Extraire les rôles disponibles pour le filtre
+        // Préparer les filtres de rôle
         const roles = new Set();
         extractedContacts.forEach(contact => {
           if (contact.role && contact.role !== "Poste non spécifié") {
-            // Extraire le type principal de rôle (ex: Directeur, CEO, etc.)
             const mainRole = contact.role.split(" ")[0];
             if (mainRole) {
               roles.add(mainRole);
@@ -68,9 +63,9 @@ const ContactTabContent = ({ combinedRelevanceMatrix, data, isLoadingRss }) => {
     extractContacts();
   }, [combinedRelevanceMatrix]);
 
-  // Filtrer les contacts selon les critères
+  // Filtrer les contacts
   const filteredContacts = contacts.filter(contact => {
-    // Filtre par recherche (nom ou rôle)
+    // Filtre par recherche
     const matchesSearch = searchTerm === "" || 
       contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       contact.role.toLowerCase().includes(searchTerm.toLowerCase());
@@ -82,16 +77,15 @@ const ContactTabContent = ({ combinedRelevanceMatrix, data, isLoadingRss }) => {
     return matchesSearch && matchesRole;
   });
 
-  // Associer les offres pertinentes à chaque contact
+  // Ajouter les offres pertinentes
   const contactsWithOffers = filteredContacts.map(contact => {
     const relatedOffers = new Set();
     
-    // Parcourir les sources du contact (actualités où il est mentionné)
     contact.sources.forEach(source => {
-      // Trouver les offres associées à cette actualité
       combinedRelevanceMatrix.forEach(item => {
         if (item.news === source.title) {
-          relatedOffers.add(item.offerDetail);
+          const offers = item.offerDetail.split(", ");
+          offers.forEach(offer => relatedOffers.add(offer));
         }
       });
     });
@@ -102,85 +96,103 @@ const ContactTabContent = ({ combinedRelevanceMatrix, data, isLoadingRss }) => {
     };
   });
 
-  // Trier par nom
+  // Trier les contacts par nom
   const sortedContacts = [...contactsWithOffers].sort((a, b) => 
     a.name.localeCompare(b.name)
   );
 
+  // Gestion de la sélection des contacts
+  const toggleContact = (contact) => {
+    if (selectedContacts.includes(contact.name)) {
+      setSelectedContacts(selectedContacts.filter(name => name !== contact.name));
+    } else {
+      setSelectedContacts([...selectedContacts, contact.name]);
+    }
+  };
+
+  // Export CSV des contacts sélectionnés
+  const exportContacts = () => {
+    const contactsToExport = sortedContacts.filter(contact => 
+      selectedContacts.includes(contact.name)
+    );
+    
+    if (contactsToExport.length === 0) {
+      alert("Veuillez sélectionner des contacts à exporter");
+      return;
+    }
+    
+    // Créer le contenu CSV
+    const headers = ["Nom", "Fonction", "Entreprise", "Offres associées", "Source"];
+    const rows = contactsToExport.map(contact => [
+      contact.name,
+      contact.role,
+      "Schneider Electric",
+      contact.relatedOffers.join(" | "),
+      contact.sources.map(s => s.title).join(" | ")
+    ]);
+    
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(","))
+    ].join("\n");
+    
+    // Créer et télécharger le fichier
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    
+    const date = new Date().toISOString().slice(0, 10);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `contacts_schneider_${date}.csv`);
+    link.style.visibility = "hidden";
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="premium-contacts-tab">
+      {/* Overlay de chargement */}
       {(loading || isLoadingRss) && (
         <div className="premium-loading-overlay">
           <LoadingSpinner size="large" color="primary" />
-          <p>Extraction des contacts à partir des actualités...</p>
+          <p>Extraction des contacts en cours...</p>
         </div>
       )}
 
-      <h2 className="premium-section-title">
-        Contacts identifiés chez Schneider Electric
-        {contacts.length > 0 && ` (${contacts.length})`}
-      </h2>
+      {/* En-tête avec actions */}
+      <div className="contacts-header">
+        <h2 className="contacts-title">
+          Contacts identifiés chez Schneider Electric
+          {contacts.length > 0 && ` (${contacts.length})`}
+        </h2>
+        <div className="contacts-actions">
+          <button 
+            className="export-button"
+            onClick={exportContacts}
+            disabled={selectedContacts.length === 0}
+          >
+            Exporter {selectedContacts.length} contact{selectedContacts.length !== 1 ? 's' : ''}
+          </button>
+        </div>
+      </div>
 
       {/* Filtres */}
-      <div className="premium-contacts-filters" style={{
-        display: "flex",
-        gap: "16px",
-        marginBottom: "24px",
-        flexWrap: "wrap"
-      }}>
-        <div style={{ flex: "1", minWidth: "200px" }}>
-          <label htmlFor="contactSearch" style={{ 
-            display: "block",
-            marginBottom: "8px",
-            fontSize: "14px",
-            fontWeight: "500"
-          }}>
-            Rechercher un contact
-          </label>
+      <div className="contacts-filters">
+        <div className="filter-group">
           <input
-            id="contactSearch"
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Nom ou fonction..."
-            style={{
-              width: "100%",
-              padding: "10px 16px",
-              borderRadius: "var(--border-radius)",
-              border: "1px solid var(--divider)",
-              backgroundColor: "var(--glass-bg)",
-              backdropFilter: "blur(10px)",
-              WebkitBackdropFilter: "blur(10px)"
-            }}
+            placeholder="Rechercher un nom ou une fonction..."
+            className="search-input"
           />
-        </div>
-
-        <div style={{ flex: "1", minWidth: "200px" }}>
-          <label htmlFor="roleFilter" style={{ 
-            display: "block",
-            marginBottom: "8px",
-            fontSize: "14px",
-            fontWeight: "500"
-          }}>
-            Filtrer par fonction
-          </label>
+          
           <select
-            id="roleFilter"
             value={filterRole}
             onChange={(e) => setFilterRole(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "10px 16px",
-              borderRadius: "var(--border-radius)",
-              border: "1px solid var(--divider)",
-              backgroundColor: "var(--glass-bg)",
-              backdropFilter: "blur(10px)",
-              WebkitBackdropFilter: "blur(10px)",
-              appearance: "none",
-              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%234b5563' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E")`,
-              backgroundRepeat: "no-repeat",
-              backgroundPosition: "right 12px center"
-            }}
+            className="role-select"
           >
             <option value="all">Toutes les fonctions</option>
             {availableRoles.map(role => (
@@ -188,221 +200,123 @@ const ContactTabContent = ({ combinedRelevanceMatrix, data, isLoadingRss }) => {
             ))}
           </select>
         </div>
+        
+        {searchTerm && (
+          <div className="search-filter">
+            <span>Recherche: <strong>{searchTerm}</strong></span>
+            <button className="clear-search" onClick={() => setSearchTerm("")}>
+              ✕
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Liste des contacts */}
+      {/* Tableau des contacts */}
       {sortedContacts.length > 0 ? (
-        <div className="premium-contacts-list" style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(400px, 1fr))",
-          gap: "20px"
-        }}>
-          {sortedContacts.map((contact, index) => (
-            <div 
-              key={index}
-              className="premium-contact-card"
-              style={{
-                backgroundColor: "var(--glass-bg)",
-                backdropFilter: "blur(15px)",
-                WebkitBackdropFilter: "blur(15px)",
-                borderRadius: "var(--border-radius)",
-                padding: "20px",
-                boxShadow: "var(--glass-shadow-md)",
-                border: "1px solid var(--glass-border)",
-                transition: "transform 0.2s ease, box-shadow 0.2s ease",
-                position: "relative",
-                overflow: "hidden"
-              }}
-            >
-              {/* En-tête du contact */}
-              <div style={{ marginBottom: "16px" }}>
-                <h3 style={{ fontSize: "18px", fontWeight: "600", marginBottom: "4px" }}>
-                  {contact.name}
-                </h3>
-                <div style={{ 
-                  fontSize: "14px", 
-                  fontWeight: "500", 
-                  color: "var(--primary)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px"
-                }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  {contact.role || "Fonction non spécifiée"}
-                </div>
-              </div>
-
-              {/* Offres pertinentes */}
-              <div style={{ marginBottom: "16px" }}>
-                <h4 style={{ 
-                  fontSize: "14px", 
-                  fontWeight: "500", 
-                  marginBottom: "8px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  color: "var(--text-secondary)"
-                }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M22 12h-4l-3 9L9 3l-3 9H2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  Offres associées
-                </h4>
-                <div style={{
-                  display: "flex",
-                  gap: "6px",
-                  flexWrap: "wrap"
-                }}>
-                  {contact.relatedOffers.length > 0 ? (
-                    contact.relatedOffers.map((offer, idx) => (
-                      <span 
-                        key={idx}
-                        style={{
-                          fontSize: "12px",
-                          fontWeight: "500",
-                          padding: "4px 10px",
-                          backgroundColor: "rgba(0, 113, 243, 0.1)",
-                          color: "var(--primary)",
-                          borderRadius: "100px"
-                        }}
+        <div className="contacts-table-container">
+          <table className="contacts-table">
+            <thead>
+              <tr>
+                <th className="checkbox-column">
+                  <input 
+                    type="checkbox" 
+                    checked={selectedContacts.length === sortedContacts.length && sortedContacts.length > 0}
+                    onChange={() => {
+                      if (selectedContacts.length === sortedContacts.length) {
+                        setSelectedContacts([]);
+                      } else {
+                        setSelectedContacts(sortedContacts.map(c => c.name));
+                      }
+                    }}
+                  />
+                </th>
+                <th>Nom</th>
+                <th>Fonction</th>
+                <th>Offres associées</th>
+                <th>Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedContacts.map((contact, index) => (
+                <tr key={index} className={selectedContacts.includes(contact.name) ? "selected-row" : ""}>
+                  <td>
+                    <input 
+                      type="checkbox" 
+                      checked={selectedContacts.includes(contact.name)}
+                      onChange={() => toggleContact(contact)}
+                    />
+                  </td>
+                  <td>{contact.name}</td>
+                  <td>{contact.role}</td>
+                  <td>
+                    <div className="offer-tags">
+                      {contact.relatedOffers.slice(0, 2).map((offer, idx) => (
+                        <span key={idx} className="offer-tag">{offer}</span>
+                      ))}
+                      {contact.relatedOffers.length > 2 && (
+                        <span className="offer-more">+{contact.relatedOffers.length - 2}</span>
+                      )}
+                    </div>
+                  </td>
+                  <td>
+                    {contact.sources[0]?.link ? (
+                      <a 
+                        href={contact.sources[0].link} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="source-link"
                       >
-                        {offer}
+                        {contact.sources[0].title.length > 30 
+                          ? contact.sources[0].title.substring(0, 30) + "..."
+                          : contact.sources[0].title
+                        }
+                      </a>
+                    ) : (
+                      <span>
+                        {contact.sources[0]?.title.length > 30 
+                          ? contact.sources[0].title.substring(0, 30) + "..."
+                          : contact.sources[0]?.title || "N/A"
+                        }
                       </span>
-                    ))
-                  ) : (
-                    <span style={{ fontSize: "14px", color: "var(--text-tertiary)", fontStyle: "italic" }}>
-                      Aucune offre spécifique identifiée
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Sources (actualités où le contact est mentionné) */}
-              <div>
-                <h4 style={{ 
-                  fontSize: "14px", 
-                  fontWeight: "500", 
-                  marginBottom: "8px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  color: "var(--text-secondary)"
-                }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M7 7h10M7 12h10M7 17h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  Mentionné dans
-                </h4>
-                <ul style={{ 
-                  margin: 0, 
-                  padding: 0,
-                  listStyle: "none"
-                }}>
-                  {contact.sources.map((source, idx) => (
-                    <li 
-                      key={idx}
-                      style={{
-                        fontSize: "13px",
-                        marginBottom: "6px",
-                        paddingBottom: "6px",
-                        borderBottom: idx < contact.sources.length - 1 ? "1px solid var(--divider)" : "none"
-                      }}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
-                        <div>
-                          {source.link ? (
-                            <a 
-                              href={source.link} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              style={{
-                                color: "var(--primary)",
-                                textDecoration: "none",
-                                fontWeight: "500"
-                              }}
-                            >
-                              {source.title.length > 50 ? `${source.title.substring(0, 50)}...` : source.title}
-                            </a>
-                          ) : (
-                            <span style={{ fontWeight: "500" }}>
-                              {source.title.length > 50 ? `${source.title.substring(0, 50)}...` : source.title}
-                            </span>
-                          )}
-                        </div>
-                        <span style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>
-                          {source.date}
-                        </span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          ))}
+                    )}
+                    {contact.sources.length > 1 && (
+                      <span className="source-count">+{contact.sources.length - 1}</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : (
         <div className="empty-state">
-          <div className="empty-state-icon">
-            <svg
-              width="64"
-              height="64"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <circle
-                cx="9"
-                cy="7"
-                r="4"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M23 21v-2a4 4 0 0 0-3-3.87"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M16 3.13a4 4 0 0 1 0 7.75"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
+          <div className="empty-icon">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
-          <div className="empty-state-text">
-            {loading ? (
-              "Extraction des contacts en cours..."
-            ) : (
-              <>
-                {contacts.length === 0 ? (
-                  "Aucun contact n'a été identifié dans les actualités."
-                ) : (
-                  "Aucun contact ne correspond à vos critères de recherche."
-                )}
-                <br />
-                <small>
-                  Essayez de modifier vos filtres ou de rafraîchir les actualités.
-                </small>
-              </>
-            )}
-          </div>
+          <p className="empty-message">
+            {loading 
+              ? "Extraction des contacts en cours..." 
+              : contacts.length === 0 
+                ? "Aucun contact n'a été identifié dans les actualités."
+                : "Aucun contact ne correspond à vos critères de recherche."
+            }
+          </p>
+          {!loading && contacts.length > 0 && (
+            <button 
+              className="reset-button"
+              onClick={() => {
+                setSearchTerm("");
+                setFilterRole("all");
+              }}
+            >
+              Réinitialiser les filtres
+            </button>
+          )}
         </div>
       )}
     </div>
