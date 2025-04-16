@@ -5,6 +5,7 @@ import MatrixTabContent from "./components/MatrixTabContent";
 import ServiceLineTabContent from "./components/ServiceLineTabContent";
 import ContactTabContent from "./components/ContactTabContent";
 import LoadingSpinner from "./components/LoadingSpinner";
+// Modification du chemin d'import pour les styles
 import "./styles/main.css";
 
 /**
