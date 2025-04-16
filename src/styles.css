@@ -19,6 +19,7 @@
   --apple-radius-sm: 8px;
   --apple-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
   --apple-transition: 0.2s all ease;
+  --apple-navbar-height: 44px;
 }
 
 * {
@@ -35,12 +36,15 @@ body {
   -moz-osx-font-smoothing: grayscale;
   line-height: 1.47059;
   letter-spacing: -0.022em;
+  margin: 0;
+  padding: 0;
 }
 
 .container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 36px 24px;
+  padding-top: calc(var(--apple-navbar-height) + 16px);
 }
 
 h1 {
@@ -77,6 +81,190 @@ h3 {
   text-align: center;
   color: var(--apple-text-secondary);
   margin-top: 24px;
+}
+
+/* Barre de navigation Apple */
+.apple-navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--apple-navbar-height);
+  background-color: rgba(255, 255, 255, 0.8);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  z-index: 1000;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.apple-navbar-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 100%;
+  padding: 0 24px;
+}
+
+.apple-logo {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--apple-text);
+}
+
+.apple-nav-items {
+  display: flex;
+  list-style: none;
+  height: 100%;
+}
+
+.apple-nav-item {
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.apple-nav-item button {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--apple-text);
+  background: none;
+  border: none;
+  padding: 0 12px;
+  height: 100%;
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: var(--apple-transition);
+}
+
+.apple-nav-item button:hover {
+  color: var(--apple-blue);
+}
+
+.apple-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.apple-search-button {
+  background: none;
+  border: none;
+  color: var(--apple-text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  transition: var(--apple-transition);
+}
+
+.apple-search-button:hover {
+  color: var(--apple-blue);
+}
+
+.apple-menu-icon {
+  width: 10px;
+  height: 10px;
+  transition: var(--apple-transition);
+}
+
+.apple-menu-icon.expanded {
+  transform: rotate(180deg);
+}
+
+.apple-menu-container {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+}
+
+.apple-menu-backdrop {
+  position: fixed;
+  top: var(--apple-navbar-height);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 998;
+}
+
+.apple-menu {
+  position: absolute;
+  top: 0;
+  left: -80px;
+  width: 240px;
+  background-color: rgba(255, 255, 255, 0.98);
+  border-radius: var(--apple-radius);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  z-index: 999;
+  overflow: hidden;
+  animation: apple-menu-fade-in 0.2s ease-out;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+@keyframes apple-menu-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.apple-menu-section {
+  padding: 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.apple-menu-section:last-child {
+  border-bottom: none;
+}
+
+.apple-menu-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--apple-text-secondary);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.apple-menu-list {
+  list-style: none;
+}
+
+.apple-menu-list li {
+  margin-bottom: 4px;
+}
+
+.apple-menu-list li:last-child {
+  margin-bottom: 0;
+}
+
+.apple-menu-list button {
+  width: 100%;
+  text-align: left;
+  padding: 8px 0;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--apple-text);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: var(--apple-transition);
+}
+
+.apple-menu-list button:hover {
+  color: var(--apple-blue);
 }
 
 /* Onglets */
@@ -363,7 +551,7 @@ h3 {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 60vh;
+  height: 100vh;
   width: 100%;
 }
 
@@ -554,6 +742,14 @@ h3 {
   margin-top: 36px;
 }
 
+.ml-1 {
+  margin-left: 4px;
+}
+
+.ml-2 {
+  margin-left: 8px;
+}
+
 .pl-1 {
   padding-left: 4px;
 }
@@ -630,6 +826,7 @@ h3 {
 @media (max-width: 768px) {
   .container {
     padding: 24px 16px;
+    padding-top: calc(var(--apple-navbar-height) + 16px);
   }
 
   h1 {
@@ -647,6 +844,10 @@ h3 {
 
   .stat-card {
     width: 100%;
+  }
+
+  .apple-nav-items {
+    display: none;
   }
 }
 
@@ -729,4 +930,58 @@ h3 {
 
 .toggle-icon.expanded {
   transform: rotate(90deg);
+}
+
+/* Élément Apple App */
+.apple-app {
+  min-height: 100vh;
+  width: 100%;
+}
+
+/* Styles minimalistes pour les mots-clés */
+.premium-keywords-minimal {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.premium-keyword-minimal {
+  color: var(--text-secondary);
+  padding-right: 8px;
+  position: relative;
+}
+
+.premium-keyword-minimal:not(:last-child)::after {
+  content: "•";
+  position: absolute;
+  right: 0;
+  color: var(--text-tertiary);
+}
+
+.premium-keyword-more {
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+/* Si vous préférez des puces plus grandes, utilisez ces styles */
+.premium-keywords-minimal.with-dots {
+  gap: 4px;
+}
+
+.premium-keywords-minimal.with-dots .premium-keyword-minimal {
+  padding-right: 0;
+}
+
+.premium-keywords-minimal.with-dots
+  .premium-keyword-minimal:not(:last-child)::after {
+  content: "";
+  position: static;
+  margin: 0 4px;
+}
+
+.premium-keywords-minimal.with-dots .premium-keyword-minimal:not(:last-child) {
+  margin-right: 6px;
 }

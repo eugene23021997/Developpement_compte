@@ -2,12 +2,13 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { dataService } from "./services/dataService";
 import { rssFeedService } from "./services/rssFeedService";
 import MatrixTabContent from "./components/MatrixTabContent";
-import OpportunitiesTabContent from "./components/OpportunitiesTabContent";
+import ServiceLineTabContent from "./components/ServiceLineTabContent";
+import ContactTabContent from "./components/ContactTabContent";
 import LoadingSpinner from "./components/LoadingSpinner";
 import "./premium-styles-enhanced.css";
 
 const App = () => {
-  const [activeTab, setActiveTab] = useState("matrix");
+  const [activeTab, setActiveTab] = useState("actualites");
   const [selectedOffer, setSelectedOffer] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [relevanceFilter, setRelevanceFilter] = useState(0);
@@ -32,11 +33,15 @@ const App = () => {
   const [serviceLineStats, setServiceLineStats] = useState({});
   const [yearlyStats, setYearlyStats] = useState({});
   const [offeringToServiceLine, setOfferingToServiceLine] = useState({});
-  const [expandedServiceLine, setExpandedServiceLine] = useState(null);
-  const [expandedOffer, setExpandedOffer] = useState(null);
 
   // Récupération des données
   const data = useMemo(() => dataService.getData(), []);
+
+  // Fusionner la matrice de pertinence des actualités stockées avec celles du flux RSS
+  const combinedRelevanceMatrix = useMemo(() => {
+    // Toujours inclure toutes les sources de données (importées et RSS)
+    return [...data.relevanceMatrix, ...rssRelevanceMatrix];
+  }, [data.relevanceMatrix, rssRelevanceMatrix]);
 
   // Détecter le scroll pour changer le style de la navbar
   useEffect(() => {
@@ -67,6 +72,34 @@ const App = () => {
       return parts[2];
     }
     return null;
+  };
+
+  // Fonction pour analyser les dates au format français
+  const parseCustomDate = (dateString) => {
+    // Mapping des mois abrégés en français vers leurs indices (0-11)
+    const monthMap = {
+      'Janv.': 0, 'Févr.': 1, 'Mars': 2, 'Avr.': 3, 'Mai': 4, 'Juin': 5,
+      'Juil.': 6, 'Août': 7, 'Sept.': 8, 'Oct.': 9, 'Nov.': 10, 'Déc.': 11
+    };
+    
+    // Découper la chaîne en composants
+    const parts = dateString.split(' ');
+    
+    if (parts.length !== 3) {
+      console.error(`Format de date non reconnu: ${dateString}`);
+      return new Date(0); // Date par défaut en cas d'erreur
+    }
+    
+    const day = parseInt(parts[0], 10);
+    const month = monthMap[parts[1]];
+    const year = parseInt(parts[2], 10);
+    
+    if (isNaN(day) || month === undefined || isNaN(year)) {
+      console.error(`Impossible de parser la date: ${dateString}`);
+      return new Date(0); // Date par défaut en cas d'erreur
+    }
+    
+    return new Date(year, month, day);
   };
 
   // Initialisation des données dérivées
@@ -248,33 +281,27 @@ const App = () => {
     }
   };
 
-  // Fusionner la matrice de pertinence des actualités stockées avec celles du flux RSS
-  const combinedRelevanceMatrix = useMemo(() => {
-    if (showRssOnly) {
-      return rssRelevanceMatrix;
-    } else {
-      return [...data.relevanceMatrix, ...rssRelevanceMatrix];
-    }
-  }, [data.relevanceMatrix, rssRelevanceMatrix, showRssOnly]);
-
   // Filtrer la matrice par offre, terme de recherche et score de pertinence
   const filteredMatrix = useMemo(() => {
     return combinedRelevanceMatrix.filter((item) => {
-      const matchesOffer =
-        selectedOffer === "all" || item.offerCategory === selectedOffer;
+      // Filtre par offre
+      const matchesOffer = selectedOffer === "all" || item.offerCategory === selectedOffer;
+      
+      // Filtre par terme de recherche
       const matchesSearch =
         !searchTerm ||
         item.news.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.newsCategory &&
+        (item.newsCategory && 
           item.newsCategory.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (item.offerDetail &&
           item.offerDetail.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (item.newsDescription &&
-          item.newsDescription
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase()));
+          item.newsDescription.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      // Filtre par score de pertinence
       const matchesRelevance = item.relevanceScore >= relevanceFilter;
 
+      // Retirer la condition matchesSource pour toujours inclure les deux types d'actualités
       return matchesOffer && matchesSearch && matchesRelevance;
     });
   }, [combinedRelevanceMatrix, selectedOffer, searchTerm, relevanceFilter]);
@@ -292,6 +319,8 @@ const App = () => {
           newsLink: item.newsLink || "",
           isRss: item.newsLink ? true : false, // Si un lien existe, c'est une actualité RSS
           offers: [],
+          // Ajouter un objet Date pour faciliter le tri
+          dateObj: parseCustomDate(item.newsDate)
         };
       }
 
@@ -408,20 +437,22 @@ const App = () => {
 
           <div className="premium-navbar-menu">
             <button
-              className={`premium-nav-link ${
-                activeTab === "matrix" ? "active" : ""
-              }`}
-              onClick={() => setActiveTab("matrix")}
+              className={`premium-nav-link ${activeTab === "actualites" ? "active" : ""}`}
+              onClick={() => setActiveTab("actualites")}
             >
-              Matrice
+              Actualités
             </button>
             <button
-              className={`premium-nav-link ${
-                activeTab === "opportunities" ? "active" : ""
-              }`}
-              onClick={() => setActiveTab("opportunities")}
+              className={`premium-nav-link ${activeTab === "servicelines" ? "active" : ""}`}
+              onClick={() => setActiveTab("servicelines")}
             >
-              Opportunités
+              Service Lines
+            </button>
+            <button
+              className={`premium-nav-link ${activeTab === "contacts" ? "active" : ""}`}
+              onClick={() => setActiveTab("contacts")}
+            >
+              Contacts
             </button>
           </div>
 
@@ -767,7 +798,7 @@ const App = () => {
       <main className="premium-main">
         <div className="premium-banner">
           <div className="premium-banner-content">
-            <h1>Matrice BearingPoint / Schneider Electric</h1>
+            <h1>Suivi de compte</h1>
             <p className="premium-banner-subtitle">
               Analyse de l'adéquation entre actualités et offres
             </p>
@@ -794,7 +825,7 @@ const App = () => {
                 </select>
               </div>
 
-              {activeTab === "matrix" && (
+              {activeTab === "actualites" && (
                 <>
                   <div className="premium-selector">
                     <label htmlFor="relevanceSelect">Pertinence minimum:</label>
@@ -828,102 +859,27 @@ const App = () => {
                 </>
               )}
 
-              {activeTab === "opportunities" && (
+              {activeTab === "servicelines" && (
                 <div className="premium-selector">
-                  <label htmlFor="yearSelect">Année:</label>
+                  <label htmlFor="relevanceSelect">Pertinence minimum:</label>
                   <select
-                    id="yearSelect"
-                    value={yearFilter}
-                    onChange={(e) => setYearFilter(e.target.value)}
+                    id="relevanceSelect"
+                    value={relevanceFilter}
+                    onChange={(e) =>
+                      setRelevanceFilter(parseInt(e.target.value))
+                    }
                     className="premium-select"
                   >
-                    <option value="all">Toutes les années</option>
-                    {Object.keys(yearlyStats)
-                      .sort((a, b) => parseInt(b) - parseInt(a))
-                      .map((year) => (
-                        <option key={year} value={year}>
-                          {year}
-                        </option>
-                      ))}
+                    <option value="0">Tous les scores</option>
+                    <option value="1">1 et plus</option>
+                    <option value="2">2 et plus</option>
+                    <option value="3">3 seulement</option>
                   </select>
                 </div>
               )}
 
-              {activeTab === "opportunities" && (
-                <div className="premium-selector">
-                  <label htmlFor="sortSelect">Trier par:</label>
-                  <div className="premium-sort-controls">
-                    <select
-                      id="sortSelect"
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value)}
-                      className="premium-select sort-select"
-                    >
-                      <option value="date">Date</option>
-                      <option value="value">Valeur</option>
-                      <option value="name">Nom</option>
-                      <option value="cm1">CM1%</option>
-                    </select>
-                    <button
-                      className="premium-sort-button"
-                      onClick={() =>
-                        setSortOrder(sortOrder === "asc" ? "desc" : "asc")
-                      }
-                    >
-                      {sortOrder === "asc" ? (
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <path
-                            d="M12 19V5"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                          <path
-                            d="M5 12L12 5L19 12"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      ) : (
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <path
-                            d="M12 5V19"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                          <path
-                            d="M19 12L12 19L5 12"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              )}
-
               {/* Bouton de rafraîchissement des actualités RSS */}
-              {activeTab === "matrix" && (
+              {activeTab !== "contacts" && (
                 <div className="premium-selector">
                   <label htmlFor="refreshRss">Actualités RSS:</label>
                   <button
@@ -1075,36 +1031,30 @@ const App = () => {
           </div>
 
           <div className="premium-content">
-            {activeTab === "matrix" ? (
+            {activeTab === "actualites" && (
               <MatrixTabContent
                 groupedByNews={groupedByNews}
                 offersWithNewsButNoOpp={offersWithNewsButNoOpp}
                 offeringToServiceLine={offeringToServiceLine}
                 isLoadingRss={isLoadingRss}
               />
-            ) : (
-              <OpportunitiesTabContent
+            )}
+            
+            {activeTab === "servicelines" && (
+              <ServiceLineTabContent
                 data={data}
+                combinedRelevanceMatrix={combinedRelevanceMatrix}
                 selectedOffer={selectedOffer}
                 setSelectedOffer={setSelectedOffer}
-                yearFilter={yearFilter}
-                setYearFilter={setYearFilter}
-                sortBy={sortBy}
-                setSortBy={setSortBy}
-                sortOrder={sortOrder}
-                setSortOrder={setSortOrder}
-                serviceLineStats={serviceLineStats}
-                offeringStats={offeringStats}
-                yearlyStats={yearlyStats}
-                opportunitiesByOffering={opportunitiesByOffering}
-                offeringToServiceLine={offeringToServiceLine}
-                extractYear={extractYear}
-                filteredOpportunities={filteredOpportunities}
-                sortOpportunities={sortOpportunities}
-                expandedServiceLine={expandedServiceLine}
-                setExpandedServiceLine={setExpandedServiceLine}
-                expandedOffer={expandedOffer}
-                setExpandedOffer={setExpandedOffer}
+                relevanceFilter={relevanceFilter}
+              />
+            )}
+            
+            {activeTab === "contacts" && (
+              <ContactTabContent
+                combinedRelevanceMatrix={combinedRelevanceMatrix}
+                data={data}
+                isLoadingRss={isLoadingRss}
               />
             )}
           </div>

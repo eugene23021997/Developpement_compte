@@ -3,12 +3,14 @@
  * Utilise l'API RSS2JSON pour convertir les flux RSS en JSON
  */
 
+import { contactExtractionService } from "./contactExtractionService";
+
 // L'URL de l'API RSS2JSON (gratuite avec des limites, nécessite une inscription pour plus de requêtes)
 const RSS2JSON_API_URL = "https://api.rss2json.com/v1/api.json";
 // Entrez votre clé API si vous en créez une (permet plus de requêtes)
 const RSS2JSON_API_KEY = "88vzmfaog9tacnzokqfjydvju8tbf95dn3iavrpj";
 
-// URLs des flux RSS de Schneider Electric (à adapter selon les flux officiels disponibles)
+// URLs des flux RSS de Schneider Electric et sources complémentaires
 const SCHNEIDER_RSS_FEEDS = [
   // Flux RSS officiel des communiqués de presse de Schneider Electric France
   "https://www.se.com/fr/fr/about-us/newsroom/news/rss.xml",
@@ -16,6 +18,35 @@ const SCHNEIDER_RSS_FEEDS = [
   "https://www.se.com/ww/en/about-us/newsroom/news/rss.xml",
   // Blog de Schneider Electric (si disponible en RSS)
   "https://blog.se.com/feed/",
+  // Sources complémentaires
+  "https://www.challenges.fr/rss.xml",
+  "https://www.usinenouvelle.com/rss/",
+  "https://www.01net.com/rss/",
+  "https://www.zdnet.fr/feeds/rss/actualites/",
+  "https://www.enerzine.com/feed",
+  "https://www.maddyness.com/feed/",
+];
+
+// Mots-clés pour filtrer les articles pertinents des sources générales
+const SCHNEIDER_KEYWORDS = [
+  "schneider",
+  "schneider electric",
+  "jean-pascal tricoire",
+  "peter herweck",
+  "olivier blum",
+  "efficacité énergétique",
+  "gestion énergétique",
+  "energy management",
+  "automation",
+  "automatisation industrielle",
+  "industrial automation",
+  "centre de données",
+  "data center",
+  "smart grid",
+  "smart building",
+  "bâtiment intelligent",
+  "iot industriel",
+  "iiot",
 ];
 
 // Mots-clés par catégorie d'offre pour l'analyse de pertinence
@@ -386,6 +417,8 @@ const KEYWORDS_BY_CATEGORY = {
 // Fonction pour récupérer les actualités d'un flux RSS
 async function fetchRssFeed(rssUrl) {
   try {
+    console.log(`Tentative de récupération du flux: ${rssUrl}`);
+
     // L'URL complète pour l'API RSS2JSON
     const apiUrl = `${RSS2JSON_API_URL}?rss_url=${encodeURIComponent(rssUrl)}${
       RSS2JSON_API_KEY ? `&api_key=${RSS2JSON_API_KEY}` : ""
@@ -407,81 +440,157 @@ async function fetchRssFeed(rssUrl) {
       );
     }
 
+    console.log(
+      `Nombre d'articles récupérés de ${rssUrl}: ${
+        data.items ? data.items.length : 0
+      }`
+    );
     return data.items || [];
   } catch (error) {
-    console.error("Erreur lors de la récupération du flux RSS:", error);
+    console.error(
+      `Erreur lors de la récupération du flux RSS ${rssUrl}:`,
+      error
+    );
     return [];
   }
 }
 
 // Normaliser le format des actualités pour correspondre à notre structure de données
 function normalizeNewsItem(item, source) {
-  // Extraire la date et la formater comme "06 Avr. 2025"
-  const pubDate = new Date(item.pubDate);
-  const day = pubDate.getDate().toString().padStart(2, "0");
+  try {
+    // Extraire la date et la formater comme "06 Avr. 2025"
+    const pubDate = new Date(item.pubDate);
+    const day = pubDate.getDate().toString().padStart(2, "0");
 
-  // Tableau des mois en français abrégés
-  const months = [
-    "Janv.",
-    "Févr.",
-    "Mars",
-    "Avr.",
-    "Mai",
-    "Juin",
-    "Juil.",
-    "Août",
-    "Sept.",
-    "Oct.",
-    "Nov.",
-    "Déc.",
-  ];
-  const month = months[pubDate.getMonth()];
-  const year = pubDate.getFullYear();
+    // Tableau des mois en français abrégés
+    const months = [
+      "Janv.",
+      "Févr.",
+      "Mars",
+      "Avr.",
+      "Mai",
+      "Juin",
+      "Juil.",
+      "Août",
+      "Sept.",
+      "Oct.",
+      "Nov.",
+      "Déc.",
+    ];
+    const month = months[pubDate.getMonth()];
+    const year = pubDate.getFullYear();
 
-  // Formater la date
-  const formattedDate = `${day} ${month} ${year}`;
+    // Formater la date
+    const formattedDate = `${day} ${month} ${year}`;
 
-  // Extraire les catégories
-  let categories = item.categories || [];
-  if (typeof categories === "string") {
-    categories = categories.split(",").map((cat) => cat.trim());
+    // Extraire les catégories
+    let categories = item.categories || [];
+    if (typeof categories === "string") {
+      categories = categories.split(",").map((cat) => cat.trim());
+    }
+
+    // Normaliser les catégories en français si possible
+    const categoriesStr = categories.join(", ");
+
+    // Nettoyer la description (enlever les tags HTML)
+    let cleanDescription = "";
+    if (item.description) {
+      cleanDescription = item.description.replace(/<[^>]*>?/gm, "");
+    }
+
+    return {
+      date: formattedDate,
+      title: item.title || "Sans titre",
+      category: categoriesStr || "Actualité",
+      description: cleanDescription,
+      link: item.link || "",
+      source: source,
+      pubDateTimestamp: pubDate.getTime(), // Ajouter un timestamp pour faciliter le tri
+    };
+  } catch (error) {
+    console.error("Erreur lors de la normalisation d'un article:", error);
+    // Retourner un article par défaut en cas d'erreur
+    return {
+      date: new Date().toLocaleDateString(),
+      title: item?.title || "Article sans titre",
+      category: "Actualité",
+      description: "Description non disponible",
+      link: item?.link || "",
+      source: source,
+      pubDateTimestamp: Date.now(),
+    };
+  }
+}
+
+// Vérifier si une actualité parle de Schneider Electric pour les sources générales
+function isRelevantToSchneider(newsItem) {
+  // Si la source est directement de Schneider Electric, c'est pertinent
+  if (
+    newsItem.source.includes("se.com") ||
+    newsItem.source.includes("blog.se.com")
+  ) {
+    return true;
   }
 
-  // Normaliser les catégories en français si possible
-  const categoriesStr = categories.join(", ");
+  // Pour les autres sources, vérifier si l'actualité mentionne Schneider Electric
+  const content =
+    `${newsItem.title} ${newsItem.description} ${newsItem.category}`.toLowerCase();
 
-  return {
-    date: formattedDate,
-    title: item.title,
-    category: categoriesStr || "Actualité",
-    description: item.description?.replace(/<[^>]*>?/gm, "") || "", // Enlever les balises HTML
-    link: item.link,
-    source: source,
-  };
+  // Lors du débogage, accepter tous les articles
+  // Plus tard, rétablir cette condition
+  return SCHNEIDER_KEYWORDS.some((keyword) =>
+    content.includes(keyword.toLowerCase())
+  );
 }
 
 // Fonction pour récupérer toutes les actualités de tous les flux RSS
 async function getAllNews() {
   try {
+    console.log("Début de récupération des flux RSS");
+
     // Récupérer les actualités de tous les flux en parallèle
     const newsPromises = SCHNEIDER_RSS_FEEDS.map((feed) =>
-      fetchRssFeed(feed).then((items) =>
-        items.map((item) => normalizeNewsItem(item, feed))
-      )
+      fetchRssFeed(feed).then((items) => {
+        if (!items || !Array.isArray(items)) {
+          console.log(`Aucun article récupéré ou format invalide pour ${feed}`);
+          return [];
+        }
+        return items.map((item) => normalizeNewsItem(item, feed));
+      })
     );
 
     // Attendre que toutes les requêtes soient terminées
     const newsArrays = await Promise.all(newsPromises);
 
     // Fusionner tous les tableaux d'actualités
-    const allNews = newsArrays.flat();
+    let allNews = newsArrays.flat();
+
+    console.log(`Nombre total d'articles avant filtrage: ${allNews.length}`);
+
+    // Filtrer les actualités pour ne garder que celles qui parlent de Schneider Electric
+    let filteredNews = allNews.filter(isRelevantToSchneider);
+
+    console.log(
+      `Nombre d'articles après filtrage Schneider: ${filteredNews.length}`
+    );
+
+    // Éliminer les doublons potentiels (basés sur le titre)
+    const uniqueNews = [];
+    const titles = new Set();
+
+    filteredNews.forEach((item) => {
+      if (!titles.has(item.title)) {
+        titles.add(item.title);
+        uniqueNews.push(item);
+      }
+    });
+
+    console.log(
+      `Nombre d'articles après élimination des doublons: ${uniqueNews.length}`
+    );
 
     // Trier par date (du plus récent au plus ancien)
-    return allNews.sort((a, b) => {
-      const dateA = new Date(a.date.split(" ").reverse().join(" "));
-      const dateB = new Date(b.date.split(" ").reverse().join(" "));
-      return dateB - dateA;
-    });
+    return uniqueNews.sort((a, b) => b.pubDateTimestamp - a.pubDateTimestamp);
   } catch (error) {
     console.error(
       "Erreur lors de la récupération de toutes les actualités:",
@@ -493,110 +602,81 @@ async function getAllNews() {
 
 // Fonction pour lancer une analyse de pertinence des actualités par rapport aux offres
 function analyzeNewsRelevance(news, offers) {
-  const relevanceMatrix = [];
+  try {
+    const relevanceMatrix = [];
 
-  // Pour chaque actualité
-  news.forEach((newsItem) => {
-    // Texte de l'actualité en minuscules pour la recherche
-    const newsText =
-      `${newsItem.title} ${newsItem.description} ${newsItem.category}`.toLowerCase();
+    // Pour chaque actualité
+    news.forEach((newsItem) => {
+      // Texte de l'actualité en minuscules pour la recherche
+      const newsText =
+        `${newsItem.title} ${newsItem.description} ${newsItem.category}`.toLowerCase();
 
-    // Pour chaque catégorie d'offre
-    Object.entries(KEYWORDS_BY_CATEGORY).forEach(([category, keywords]) => {
-      // Compter combien de mots clés sont présents dans l'actualité
-      let matchCount = 0;
-      let matchedKeywords = [];
+      // Pour chaque catégorie d'offre
+      Object.entries(KEYWORDS_BY_CATEGORY).forEach(([category, keywords]) => {
+        // Compter combien de mots clés sont présents dans l'actualité
+        let matchCount = 0;
+        let matchedKeywords = [];
 
-      keywords.forEach((keyword) => {
-        if (newsText.includes(keyword.toLowerCase())) {
-          matchCount++;
-          matchedKeywords.push(keyword);
-        }
-      });
-
-      // Calculer un score de pertinence de 1 à 3
-      let relevanceScore = 0;
-      if (matchCount > 3) {
-        relevanceScore = 3; // Très pertinent
-      } else if (matchCount > 1) {
-        relevanceScore = 2; // Pertinent
-      } else if (matchCount > 0) {
-        relevanceScore = 1; // Légèrement pertinent
-      }
-
-      // Si au moins un mot clé a été trouvé, ajouter à la matrice
-      if (relevanceScore > 0) {
-        // Trouver les offres détaillées correspondantes
-        const matchedOffers = [];
-
-        // Parcourir les offres détaillées pour trouver celles qui correspondent aux mots clés
-        Object.entries(offers).forEach(([serviceLine, serviceOfferings]) => {
-          if (serviceLine === category) {
-            serviceOfferings.forEach((offering) => {
-              // Vérifier si le nom de l'offre contient l'un des mots clés correspondants
-              const offeringLower = offering.toLowerCase();
-              if (
-                matchedKeywords.some((keyword) =>
-                  offeringLower.includes(keyword.toLowerCase())
-                )
-              ) {
-                matchedOffers.push(offering);
-              }
-            });
+        keywords.forEach((keyword) => {
+          if (newsText.includes(keyword.toLowerCase())) {
+            matchCount++;
+            matchedKeywords.push(keyword);
           }
         });
 
-        relevanceMatrix.push({
-          news: newsItem.title,
-          newsDate: newsItem.date,
-          newsCategory: newsItem.category,
-          newsDescription: newsItem.description,
-          newsLink: newsItem.link,
-          offerCategory: category,
-          relevanceScore: relevanceScore,
-          offerDetail: matchedOffers.join(", ") || category,
-        });
-      }
+        // Calculer un score de pertinence de 1 à 3
+        let relevanceScore = 0;
+        if (matchCount > 3) {
+          relevanceScore = 3; // Très pertinent
+        } else if (matchCount > 1) {
+          relevanceScore = 2; // Pertinent
+        } else if (matchCount > 0) {
+          relevanceScore = 1; // Légèrement pertinent
+        }
+
+        // Si au moins un mot clé a été trouvé, ajouter à la matrice
+        if (relevanceScore > 0) {
+          // Trouver les offres détaillées correspondantes
+          const matchedOffers = [];
+
+          // Parcourir les offres détaillées pour trouver celles qui correspondent aux mots clés
+          Object.entries(offers).forEach(([serviceLine, serviceOfferings]) => {
+            if (serviceLine === category) {
+              serviceOfferings.forEach((offering) => {
+                // Vérifier si le nom de l'offre contient l'un des mots clés correspondants
+                const offeringLower = offering.toLowerCase();
+                if (
+                  matchedKeywords.some((keyword) =>
+                    offeringLower.includes(keyword.toLowerCase())
+                  )
+                ) {
+                  matchedOffers.push(offering);
+                }
+              });
+            }
+          });
+
+          relevanceMatrix.push({
+            news: newsItem.title,
+            newsDate: newsItem.date,
+            newsCategory: newsItem.category,
+            newsDescription: newsItem.description,
+            newsLink: newsItem.link,
+            offerCategory: category,
+            relevanceScore: relevanceScore,
+            offerDetail: matchedOffers.join(", ") || category,
+          });
+        }
+      });
     });
-  });
 
-  return relevanceMatrix;
-}
-
-/**
- * Récupère et analyse complètement les actualités RSS
- * - Récupère les actualités de tous les flux RSS
- * - Analyse leur pertinence par rapport aux offres
- * - Extrait les contacts potentiels
- * @param {Object} offers - Structure des offres BearingPoint
- * @returns {Object} Résultats de l'analyse (actualités, matrice de pertinence, contacts)
- */
-async function getAnalyzedNews(offers) {
-  try {
-    // Récupérer toutes les actualités
-    const news = await getAllNews();
-
-    // Analyser la pertinence par rapport aux offres
-    const relevanceMatrix = analyzeNewsRelevance(news, offers);
-
-    // Extraire les contacts potentiels
-    const contacts = contactExtractionService.extractContactsFromNews(
-      news,
-      "Schneider Electric"
-    );
-
-    return {
-      news,
-      relevanceMatrix,
-      contacts,
-    };
+    return relevanceMatrix;
   } catch (error) {
-    console.error("Erreur lors de l'analyse des actualités:", error);
-    return {
-      news: [],
-      relevanceMatrix: [],
-      contacts: [],
-    };
+    console.error(
+      "Erreur lors de l'analyse de la pertinence des actualités:",
+      error
+    );
+    return [];
   }
 }
 
@@ -604,5 +684,4 @@ async function getAnalyzedNews(offers) {
 export const rssFeedService = {
   getAllNews,
   analyzeNewsRelevance,
-  getAnalyzedNews,
 };
