@@ -8,9 +8,15 @@ import LoadingSpinner from "./LoadingSpinner";
  * @param {Array} props.contacts - Liste des contacts à afficher
  * @param {boolean} props.isLoadingRss - Indicateur de chargement des flux RSS
  * @param {boolean} props.isImportedList - Indique si la liste provient d'un import Excel
+ * @param {function} props.onContactSelect - Fonction appelée lors de la sélection d'un contact
  * @returns {JSX.Element} Liste de contacts filtrables et exportables
  */
-const ContactList = ({ contacts, isLoadingRss, isImportedList = false }) => {
+const ContactList = ({ 
+  contacts, 
+  isLoadingRss, 
+  isImportedList = false,
+  onContactSelect 
+}) => {
   // États pour le filtrage et la sélection
   const [confidenceFilter, setConfidenceFilter] = useState(0.5);
   const [roleFilter, setRoleFilter] = useState("all");
@@ -23,7 +29,7 @@ const ContactList = ({ contacts, isLoadingRss, isImportedList = false }) => {
     const roles = new Set();
     contacts.forEach((contact) => {
       // Extraire le type de poste principal (ex: Directeur, CEO, etc.)
-      const mainRole = contact.role.split(" ")[0];
+      const mainRole = contact.role?.split(" ")[0];
       if (mainRole && mainRole !== "Poste" && mainRole !== "non") {
         roles.add(mainRole);
       }
@@ -42,7 +48,7 @@ const ContactList = ({ contacts, isLoadingRss, isImportedList = false }) => {
       // Filtre par rôle
       if (
         roleFilter !== "all" &&
-        !contact.role.toLowerCase().includes(roleFilter.toLowerCase())
+        !contact.role?.toLowerCase().includes(roleFilter.toLowerCase())
       ) {
         return false;
       }
@@ -54,7 +60,7 @@ const ContactList = ({ contacts, isLoadingRss, isImportedList = false }) => {
         (contact.fullName &&
           contact.fullName.toLowerCase().includes(searchText)) ||
         (contact.name && contact.name.toLowerCase().includes(searchText)) ||
-        contact.role.toLowerCase().includes(searchText) ||
+        (contact.role && contact.role.toLowerCase().includes(searchText)) ||
         (contact.department &&
           contact.department.toLowerCase().includes(searchText)) ||
         (contact.company && contact.company.toLowerCase().includes(searchText)) ||
@@ -88,6 +94,14 @@ const ContactList = ({ contacts, isLoadingRss, isImportedList = false }) => {
       );
     } else {
       setSelectedContacts([...selectedContacts, name]);
+      
+      // Notifier le parent si la fonction est fournie
+      if (onContactSelect) {
+        const contact = contacts.find(c => (c.name || c.fullName) === name);
+        if (contact) {
+          onContactSelect(contact);
+        }
+      }
     }
   };
 
@@ -100,6 +114,22 @@ const ContactList = ({ contacts, isLoadingRss, isImportedList = false }) => {
         filteredContacts.map((contact) => contact.name || contact.fullName)
       );
     }
+  };
+
+  // Générer un lien LinkedIn à partir du nom
+  const generateLinkedInSearchUrl = (name) => {
+    if (!name) return null;
+    
+    // Pour les contacts importés, on utilise la recherche LinkedIn
+    const encodedName = encodeURIComponent(name);
+    const searchUrl = `https://www.linkedin.com/search/results/people/?keywords=${encodedName}`;
+    
+    // Si le nom inclut Schneider Electric, on affine la recherche
+    if (name.toLowerCase().includes("schneider")) {
+      return `${searchUrl}&company=Schneider%20Electric`;
+    }
+    
+    return searchUrl;
   };
 
   // Formater la source en texte lisible
@@ -364,7 +394,53 @@ const ContactList = ({ contacts, isLoadingRss, isImportedList = false }) => {
                       Sélectionner {contact.name || contact.fullName}
                     </label>
                   </td>
-                  <td className="name-column">{contact.fullName || contact.name}</td>
+                  <td className="name-column">
+                    {/* Ajouter un lien LinkedIn */}
+                    <a 
+                      href={generateLinkedInSearchUrl(contact.fullName || contact.name)} 
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="linkedin-link"
+                      title="Rechercher sur LinkedIn"
+                    >
+                      {contact.fullName || contact.name}
+                      <svg 
+                        className="linkedin-icon" 
+                        width="14" 
+                        height="14" 
+                        viewBox="0 0 24 24" 
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <rect
+                          x="2"
+                          y="9"
+                          width="4"
+                          height="12"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <circle
+                          cx="4"
+                          cy="4"
+                          r="2"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </a>
+                  </td>
                   <td className="role-column">
                     {contact.role === "Poste non spécifié" ? (
                       <span className="premium-contact-unknown-role">
@@ -560,15 +636,42 @@ const ContactList = ({ contacts, isLoadingRss, isImportedList = false }) => {
           background-color: rgba(0, 113, 243, 0.12);
         }
         
+        /* Nouvelle colonne de sélection plus compacte */
         .select-column {
-          width: 48px;
+          width: 32px;
           text-align: center;
+          padding-left: 8px !important;
+          padding-right: 8px !important;
         }
         
         .name-column {
           width: 18%;
           min-width: 160px;
           font-weight: 500;
+        }
+        
+        /* Style pour le lien LinkedIn */
+        .linkedin-link {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          color: var(--text-primary);
+          text-decoration: none;
+          position: relative;
+          transition: color 0.2s ease;
+        }
+        
+        .linkedin-link:hover {
+          color: var(--primary);
+        }
+        
+        .linkedin-icon {
+          opacity: 0.3;
+          transition: opacity 0.2s ease;
+        }
+        
+        .linkedin-link:hover .linkedin-icon {
+          opacity: 0.8;
         }
         
         .role-column {
