@@ -1,6 +1,8 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
 import { contactService } from "../services/contactService";
+import { prospectionService } from "../services/prospectionService"; // Importer le service de prospection
 import ContactList from "./ContactList";
+import SelectedContactsTab from "./SelectedContactsTab"; // Importer le nouvel onglet
 import LoadingSpinner from "./LoadingSpinner";
 
 // Stockage local pour les contacts importés (persistance entre les changements d'onglets)
@@ -9,14 +11,20 @@ let storedImportedContacts = [];
 /**
  * Composant de gestion des contacts pour l'onglet Contacts
  * Permet l'extraction, l'import et l'analyse des contacts
- * Version améliorée avec persistance des contacts entre les changements d'onglets
+ * Intègre le nouvel onglet "Contacts sélectionnés" pour les opportunités de prospection
  * @param {Object} props - Propriétés du composant
  * @param {Array} props.combinedRelevanceMatrix - Matrice combinée de pertinence des actualités
  * @param {Object} props.data - Données de l'application
  * @param {boolean} props.isLoadingRss - Indicateur de chargement des flux RSS
+ * @param {Object} props.opportunitiesByOffering - Opportunités existantes par offre
  * @returns {JSX.Element} Onglet de gestion des contacts
  */
-const ContactTabContent = ({ combinedRelevanceMatrix, data, isLoadingRss }) => {
+const ContactTabContent = ({ 
+  combinedRelevanceMatrix, 
+  data, 
+  isLoadingRss,
+  opportunitiesByOffering = {}
+}) => {
   // États de gestion des contacts
   const [contacts, setContacts] = useState([]);
   const [excelContacts, setExcelContacts] = useState(storedImportedContacts); // Utiliser la valeur stockée
@@ -29,9 +37,26 @@ const ContactTabContent = ({ combinedRelevanceMatrix, data, isLoadingRss }) => {
   
   // État pour le contact sélectionné (pour l'affichage des détails)
   const [selectedContact, setSelectedContact] = useState(null);
+  
+  // État pour les opportunités sélectionnées (synchronisées avec le service)
+  const [selectedOpportunities, setSelectedOpportunities] = useState([]);
 
   // Référence pour l'input de fichier
   const fileInputRef = useRef(null);
+
+  // S'abonner aux changements d'opportunités sélectionnées
+  useEffect(() => {
+    // Obtenir les opportunités déjà sélectionnées
+    setSelectedOpportunities(prospectionService.getSelectedOpportunities());
+    
+    // S'abonner aux futurs changements
+    const unsubscribe = prospectionService.subscribe((opportunities) => {
+      setSelectedOpportunities(opportunities);
+    });
+    
+    // Se désabonner lors du démontage du composant
+    return () => unsubscribe();
+  }, []);
 
   // Extraire les contacts des actualités
   const extractContacts = useCallback(async () => {
@@ -159,7 +184,18 @@ const ContactTabContent = ({ combinedRelevanceMatrix, data, isLoadingRss }) => {
   // Charger les contacts extraits au premier rendu
   useEffect(() => {
     extractContacts();
-  }, [extractContacts]);
+    
+    // Identifier les opportunités potentielles de prospection
+    const potentialOpportunities = prospectionService.identifyNewOpportunities(
+      combinedRelevanceMatrix,
+      opportunitiesByOffering
+    );
+    
+    console.log("Opportunités de prospection identifiées:", potentialOpportunities);
+  }, [extractContacts, combinedRelevanceMatrix, opportunitiesByOffering]);
+
+  // Obtenir tous les contacts (extraits + importés)
+  const allContacts = [...contacts, ...excelContacts];
 
   return (
     <div className="contacts-content">
@@ -225,6 +261,17 @@ const ContactTabContent = ({ combinedRelevanceMatrix, data, isLoadingRss }) => {
             <span className="tab-badge">{excelContacts.length}</span>
           )}
         </button>
+        <button
+          className={`contacts-tab-button ${
+            activeTab === "selected" ? "active" : ""
+          }`}
+          onClick={() => setActiveTab("selected")}
+        >
+          Contacts recommandés
+          {selectedOpportunities.length > 0 && (
+            <span className="tab-badge highlight-badge">{selectedOpportunities.length}</span>
+          )}
+        </button>
         {missingRoles.length > 0 && (
           <button
             className={`contacts-tab-button ${
@@ -264,6 +311,14 @@ const ContactTabContent = ({ combinedRelevanceMatrix, data, isLoadingRss }) => {
                 isLoadingRss={isLoadingRss}
                 isImportedList={true}
                 onContactSelect={handleContactSelect}
+              />
+            )}
+            
+            {activeTab === "selected" && (
+              <SelectedContactsTab
+                contacts={allContacts}
+                selectedOpportunities={selectedOpportunities}
+                isLoading={loading || isLoadingRss}
               />
             )}
 
@@ -563,300 +618,22 @@ const ContactTabContent = ({ combinedRelevanceMatrix, data, isLoadingRss }) => {
         )}
       </div>
 
-      {/* Styles pour le nouvel agencement et le panneau de détails */}
+      {/* Styles pour le nouvel onglet */}
       <style jsx>{`
-        .contacts-layout {
-          display: flex;
-          gap: 24px;
-          position: relative;
+        .highlight-badge {
+          background-color: #ec4899 !important;
+          animation: pulse 2s infinite;
         }
         
-        .contacts-layout.with-details .contacts-main-content {
-          width: 70%;
-        }
-        
-        .contacts-main-content {
-          flex: 1;
-          transition: width 0.3s ease;
-        }
-        
-        .contact-details-panel {
-          width: 30%;
-          min-width: 300px;
-          background-color: var(--glass-bg);
-          backdrop-filter: blur(15px);
-          -webkit-backdrop-filter: blur(15px);
-          border-radius: var(--border-radius-lg);
-          border: 1px solid var(--glass-border);
-          box-shadow: var(--glass-shadow-md);
-          overflow: hidden;
-          display: flex;
-          flex-direction: column;
-          animation: slideIn 0.3s ease;
-        }
-        
-        @keyframes slideIn {
-          from {
-            opacity: 0;
-            transform: translateX(20px);
+        @keyframes pulse {
+          0% {
+            box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.4);
           }
-          to {
-            opacity: 1;
-            transform: translateX(0);
+          70% {
+            box-shadow: 0 0 0 8px rgba(236, 72, 153, 0);
           }
-        }
-        
-        .contact-details-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 16px;
-          border-bottom: 1px solid var(--divider);
-        }
-        
-        .contact-details-header h3 {
-          margin: 0;
-          font-size: 16px;
-          font-weight: 600;
-          color: var(--text-secondary);
-        }
-        
-        .close-details-button {
-          background: none;
-          border: none;
-          cursor: pointer;
-          color: var(--text-tertiary);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
-          transition: all 0.2s ease;
-        }
-        
-        .close-details-button:hover {
-          background-color: rgba(0, 0, 0, 0.05);
-          color: var(--text-secondary);
-        }
-        
-        .contact-details-content {
-          padding: 24px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          text-align: center;
-        }
-        
-        .contact-details-avatar {
-          width: 80px;
-          height: 80px;
-          border-radius: 50%;
-          background: linear-gradient(135deg, var(--primary), var(--secondary));
-          color: white;
-          font-size: 36px;
-          font-weight: 500;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin-bottom: 16px;
-          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-        }
-        
-        .contact-details-name {
-          font-size: 24px;
-          font-weight: 600;
-          margin: 0 0 8px 0;
-          color: var(--text-primary);
-        }
-        
-        .contact-details-role {
-          font-size: 16px;
-          color: var(--text-secondary);
-          margin-bottom: 24px;
-        }
-        
-        .unknown-role {
-          font-style: italic;
-          color: var(--text-tertiary);
-        }
-        
-        .contact-details-company {
-          width: 100%;
-          margin-bottom: 16px;
-          padding-bottom: 16px;
-          border-bottom: 1px solid var(--divider);
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-        }
-        
-        .contact-details-company label,
-        .contact-details-info label,
-        .contact-details-sources label {
-          font-size: 12px;
-          text-transform: uppercase;
-          color: var(--text-tertiary);
-          margin-bottom: 4px;
-          letter-spacing: 0.5px;
-        }
-        
-        .contact-details-company span {
-          font-weight: 500;
-          color: var(--text-primary);
-        }
-        
-        .contact-details-info {
-          width: 100%;
-          margin-bottom: 16px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-        }
-        
-        .contact-details-email,
-        .contact-details-phone {
-          color: var(--primary);
-          text-decoration: none;
-          transition: color 0.2s ease;
-        }
-        
-        .contact-details-email:hover,
-        .contact-details-phone:hover {
-          color: var(--primary-hover);
-          text-decoration: underline;
-        }
-        
-        .contact-details-sources {
-          width: 100%;
-          margin-top: 8px;
-          margin-bottom: 24px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-        }
-        
-        .contact-sources-list {
-          list-style: none;
-          padding: 0;
-          margin: 8px 0 0 0;
-          width: 100%;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          max-height: 200px;
-          overflow-y: auto;
-        }
-        
-        .contact-source-item {
-          background-color: rgba(255, 255, 255, 0.5);
-          border-radius: var(--border-radius);
-          padding: 8px 12px;
-          font-size: 13px;
-          display: flex;
-          flex-direction: column;
-          align-items: flex-start;
-          text-align: left;
-        }
-        
-        .contact-source-link,
-        .contact-source-title {
-          color: var(--text-primary);
-          font-weight: 500;
-          margin-bottom: 4px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          width: 100%;
-          white-space: nowrap;
-        }
-        
-        .contact-source-link {
-          text-decoration: none;
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          color: var(--primary);
-        }
-        
-        .contact-source-link:hover {
-          text-decoration: underline;
-        }
-        
-        .contact-source-date {
-          font-size: 12px;
-          color: var(--text-tertiary);
-        }
-        
-        .contact-details-actions {
-          width: 100%;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-        
-        .linkedin-search-button,
-        .email-button {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          padding: 10px 16px;
-          border-radius: var(--border-radius);
-          font-size: 14px;
-          font-weight: 500;
-          text-decoration: none;
-          transition: all 0.2s ease;
-        }
-        
-        .linkedin-search-button {
-          background-color: #0077B5;
-          color: white;
-        }
-        
-        .linkedin-search-button:hover {
-          background-color: #006097;
-        }
-        
-        .email-button {
-          background-color: var(--primary);
-          color: white;
-        }
-        
-        .email-button:hover {
-          background-color: var(--primary-hover);
-        }
-        
-        /* Style pour le badge du nombre de contacts importés */
-        .tab-badge {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          background-color: var(--primary);
-          color: white;
-          font-size: 12px;
-          font-weight: 500;
-          height: 18px;
-          min-width: 18px;
-          border-radius: 9px;
-          padding: 0 6px;
-          margin-left: 8px;
-        }
-        
-        /* Responsive */
-        @media (max-width: 992px) {
-          .contacts-layout.with-details {
-            flex-direction: column;
-          }
-          
-          .contacts-layout.with-details .contacts-main-content {
-            width: 100%;
-          }
-          
-          .contact-details-panel {
-            width: 100%;
-            min-width: auto;
-            order: -1;
-            margin-bottom: 24px;
+          100% {
+            box-shadow: 0 0 0 0 rgba(236, 72, 153, 0);
           }
         }
       `}</style>
