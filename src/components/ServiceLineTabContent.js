@@ -1,9 +1,10 @@
-import React, { useState } from "react";
-import NewsCard from "./NewsCard";  // Correction: import de "./NewsCard" au lieu de "./matrix/NewsCard"
+import React, { useState, useMemo } from "react";
+import NewsCard from "./NewsCard";
 import { InfoIcon } from "./Icons";
 
 /**
  * Composant pour afficher l'onglet des lignes de service et leurs actualités associées
+ * Modifié pour intégrer les animations des cartes d'actualités par ligne identiques à l'onglet Actualités
  * @param {Object} props - Les propriétés du composant
  * @param {Object} props.data - Les données de l'application
  * @param {Object} props.combinedRelevanceMatrix - Matrice de pertinence combinée
@@ -22,6 +23,10 @@ const ServiceLineTabContent = ({
   // État pour suivre les lignes de service et offres développées
   const [expandedServiceLine, setExpandedServiceLine] = useState(null);
   const [expandedOffer, setExpandedOffer] = useState(null);
+  
+  // NOUVEAU: Gestion des lignes d'actualités développées par contexte
+  const [expandedServiceLineRows, setExpandedServiceLineRows] = useState({});
+  const [expandedOfferingRows, setExpandedOfferingRows] = useState({});
 
   /**
    * Fonction pour regrouper les actualités par offre
@@ -169,6 +174,102 @@ const ServiceLineTabContent = ({
     });
   };
 
+  /**
+   * Calcule l'indice de la ligne selon la taille d'écran actuelle
+   * @param {number} index - L'index de la carte dans la grille
+   * @param {string} context - Contexte ('serviceLine' ou 'offering')
+   * @returns {number} Indice de la ligne
+   */
+  const getRowIndex = (index, context = 'serviceLine') => {
+    // Déterminer la taille de la grille en fonction de la largeur de l'écran
+    const gridColumns = window.innerWidth >= 1280 ? 3 : 
+                       window.innerWidth >= 768 ? 2 : 1;
+    
+    // Calculer l'indice de la ligne
+    return Math.floor(index / gridColumns);
+  };
+
+  /**
+   * Gère le clic pour déplier/replier une rangée de cartes dans la ligne de service
+   * @param {string} serviceLine - La ligne de service concernée
+   * @param {number} rowIndex - L'indice de la ligne à déplier/replier
+   */
+  const handleServiceLineRowToggle = (serviceLine, rowIndex) => {
+    setExpandedServiceLineRows(prev => {
+      const currentRows = prev[serviceLine] || [];
+      
+      // Si la ligne est déjà dépliée, la replier
+      if (currentRows.includes(rowIndex)) {
+        return {
+          ...prev,
+          [serviceLine]: currentRows.filter(r => r !== rowIndex)
+        };
+      } 
+      // Sinon, la déplier
+      else {
+        return {
+          ...prev,
+          [serviceLine]: [...currentRows, rowIndex]
+        };
+      }
+    });
+  };
+
+  /**
+   * Gère le clic pour déplier/replier une rangée de cartes dans une offre
+   * @param {string} serviceLine - La ligne de service parente
+   * @param {string} offering - L'offre concernée
+   * @param {number} rowIndex - L'indice de la ligne à déplier/replier
+   */
+  const handleOfferingRowToggle = (serviceLine, offering, rowIndex) => {
+    const offeringKey = `${serviceLine}_${offering}`;
+    
+    setExpandedOfferingRows(prev => {
+      const currentRows = prev[offeringKey] || [];
+      
+      // Si la ligne est déjà dépliée, la replier
+      if (currentRows.includes(rowIndex)) {
+        return {
+          ...prev,
+          [offeringKey]: currentRows.filter(r => r !== rowIndex)
+        };
+      } 
+      // Sinon, la déplier
+      else {
+        return {
+          ...prev,
+          [offeringKey]: [...currentRows, rowIndex]
+        };
+      }
+    });
+  };
+
+  /**
+   * Vérifie si une carte d'actualité est dépliée dans la ligne de service
+   * @param {string} serviceLine - La ligne de service
+   * @param {number} index - L'index de la carte
+   * @returns {boolean} Vrai si la carte est dépliée
+   */
+  const isServiceLineNewsExpanded = (serviceLine, index) => {
+    const rowIndex = getRowIndex(index);
+    const expandedRows = expandedServiceLineRows[serviceLine] || [];
+    return expandedRows.includes(rowIndex);
+  };
+
+  /**
+   * Vérifie si une carte d'actualité est dépliée dans une offre
+   * @param {string} serviceLine - La ligne de service parente
+   * @param {string} offering - L'offre concernée
+   * @param {number} index - L'index de la carte
+   * @returns {boolean} Vrai si la carte est dépliée
+   */
+  const isOfferingNewsExpanded = (serviceLine, offering, index) => {
+    const offeringKey = `${serviceLine}_${offering}`;
+    const rowIndex = getRowIndex(index);
+    const expandedRows = expandedOfferingRows[offeringKey] || [];
+    return expandedRows.includes(rowIndex);
+  };
+
   return (
     <div className="premium-service-lines-content">
       <h2 className="premium-section-title">
@@ -308,6 +409,11 @@ const ServiceLineTabContent = ({
                           <NewsCard
                             key={`${serviceLine}-news-${index}`}
                             news={news}
+                            expanded={isServiceLineNewsExpanded(serviceLine, index)}
+                            onToggle={() => handleServiceLineRowToggle(
+                              serviceLine, 
+                              getRowIndex(index)
+                            )}
                           />
                         )
                       )}
@@ -453,8 +559,14 @@ const ServiceLineTabContent = ({
                               {sortNewsByDate(offeringData.news).map(
                                 (news, index) => (
                                   <NewsCard
-                                    key={`${offering}-news-${index}`}
+                                    key={`${serviceLine}-${offering}-news-${index}`}
                                     news={news}
+                                    expanded={isOfferingNewsExpanded(serviceLine, offering, index)}
+                                    onToggle={() => handleOfferingRowToggle(
+                                      serviceLine, 
+                                      offering, 
+                                      getRowIndex(index)
+                                    )}
                                   />
                                 )
                               )}
@@ -537,6 +649,26 @@ const ServiceLineTabContent = ({
           </div>
         </div>
       )}
+
+      {/* Style pour la gestion des lignes */}
+      <style jsx>{`
+        @media (min-width: 768px) and (max-width: 1279px) {
+          .premium-news-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+        
+        @media (min-width: 1280px) {
+          .premium-news-grid {
+            grid-template-columns: repeat(3, 1fr);
+          }
+        }
+        
+        .premium-news-grid {
+          display: grid;
+          gap: 24px;
+        }
+      `}</style>
     </div>
   );
 };
