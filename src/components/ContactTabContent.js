@@ -21,6 +21,7 @@ const ContactTabContent = ({ combinedRelevanceMatrix, data, isLoadingRss }) => {
   const [activeTab, setActiveTab] = useState("extracted");
   const [missingRoles, setMissingRoles] = useState([]);
   const [missingRoleContacts, setMissingRoleContacts] = useState([]);
+  const [importError, setImportError] = useState(null);
 
   // Référence pour l'input de fichier
   const fileInputRef = useRef(null);
@@ -63,12 +64,19 @@ const ContactTabContent = ({ combinedRelevanceMatrix, data, isLoadingRss }) => {
     }
   }, [data, combinedRelevanceMatrix]);
 
-  // Importer des contacts depuis un fichier Excel
+  // Importer des contacts depuis un fichier
   const importExcelContacts = useCallback(
     async (file) => {
       setImportLoading(true);
+      setImportError(null); // Réinitialiser les erreurs précédentes
+      
       try {
-        // Importer les contacts depuis le fichier Excel
+        // Vérifier que file est bien un objet File
+        if (!(file instanceof File)) {
+          throw new Error("Le paramètre fourni n'est pas un fichier valide");
+        }
+        
+        // Importer les contacts depuis le fichier
         const importedContacts = await contactService.importContacts(file);
 
         // Analyser la pertinence des contacts importés
@@ -105,8 +113,12 @@ const ContactTabContent = ({ combinedRelevanceMatrix, data, isLoadingRss }) => {
         alert(
           `${importedContacts.length} contacts ont été importés avec succès!`
         );
+        
+        // Passer automatiquement à l'onglet "importés"
+        setActiveTab("imported");
       } catch (error) {
         console.error("Erreur lors de l'importation des contacts:", error);
+        setImportError(`Erreur lors de l'importation: ${error.message}`);
         alert(`Erreur lors de l'importation des contacts: ${error.message}`);
       } finally {
         setImportLoading(false);
@@ -123,7 +135,8 @@ const ContactTabContent = ({ combinedRelevanceMatrix, data, isLoadingRss }) => {
     (event) => {
       const file = event.target.files[0];
       if (file) {
-        importExcelContacts(file.name);
+        // Passer l'objet File directement, pas juste le nom
+        importExcelContacts(file);
       }
     },
     [importExcelContacts]
@@ -162,6 +175,20 @@ const ContactTabContent = ({ combinedRelevanceMatrix, data, isLoadingRss }) => {
           </button>
         </div>
       </div>
+
+      {/* Affichage des erreurs d'importation */}
+      {importError && (
+        <div className="error-message" style={{
+          padding: "12px 16px",
+          margin: "16px 0",
+          backgroundColor: "rgba(220, 38, 38, 0.1)",
+          border: "1px solid rgba(220, 38, 38, 0.3)",
+          borderRadius: "8px",
+          color: "#dc2626"
+        }}>
+          <strong>Erreur:</strong> {importError}
+        </div>
+      )}
 
       {/* Onglets */}
       <div className="contacts-tabs">
