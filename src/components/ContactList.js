@@ -102,6 +102,14 @@ const ContactList = ({ contacts, isLoadingRss, isImportedList = false }) => {
     }
   };
 
+  // Formater la source en texte lisible
+  const formatSource = (source) => {
+    if (!source || !source.title) {
+      return "Actualité sans titre";
+    }
+    return source.title.length > 50 ? source.title.substring(0, 47) + '...' : source.title;
+  };
+
   // Export des contacts sélectionnés
   const exportContacts = () => {
     // Filtrer les contacts à exporter
@@ -330,6 +338,7 @@ const ContactList = ({ contacts, isLoadingRss, isImportedList = false }) => {
                 <th className="name-column">Full Name</th>
                 <th className="role-column">Role</th>
                 <th className="email-column">Email</th>
+                {!isImportedList && <th className="source-column">Source</th>}
               </tr>
             </thead>
             <tbody>
@@ -374,6 +383,66 @@ const ContactList = ({ contacts, isLoadingRss, isImportedList = false }) => {
                       <span className="premium-contact-empty">Email non disponible</span>
                     )}
                   </td>
+                  {!isImportedList && (
+                    <td className="source-column">
+                      {contact.sources && contact.sources.length > 0 ? (
+                        <div className="source-info">
+                          {contact.sources[0].link ? (
+                            <a 
+                              href={contact.sources[0].link} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="source-link"
+                              title={contact.sources[0].title}
+                            >
+                              {formatSource(contact.sources[0])}
+                              <svg 
+                                className="external-link-icon" 
+                                width="10" 
+                                height="10" 
+                                viewBox="0 0 24 24" 
+                                fill="none" 
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <path 
+                                  d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" 
+                                  stroke="currentColor" 
+                                  strokeWidth="2" 
+                                  strokeLinecap="round" 
+                                  strokeLinejoin="round"
+                                />
+                                <path 
+                                  d="M15 3h6v6" 
+                                  stroke="currentColor" 
+                                  strokeWidth="2" 
+                                  strokeLinecap="round" 
+                                  strokeLinejoin="round"
+                                />
+                                <path 
+                                  d="M10 14L21 3" 
+                                  stroke="currentColor" 
+                                  strokeWidth="2" 
+                                  strokeLinecap="round" 
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                            </a>
+                          ) : (
+                            <span className="source-title" title={contact.sources[0].title}>
+                              {formatSource(contact.sources[0])}
+                            </span>
+                          )}
+                          {contact.sources.length > 1 && (
+                            <span className="source-count">
+                              +{contact.sources.length - 1} autres
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="premium-contact-empty">Source non disponible</span>
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -497,18 +566,22 @@ const ContactList = ({ contacts, isLoadingRss, isImportedList = false }) => {
         }
         
         .name-column {
-          width: 20%;
-          min-width: 180px;
+          width: 18%;
+          min-width: 160px;
           font-weight: 500;
         }
         
         .role-column {
-          width: 50%;
+          width: 30%;
         }
         
         .email-column {
+          width: 22%;
+          min-width: 180px;
+        }
+        
+        .source-column {
           width: 30%;
-          min-width: 200px;
         }
         
         .contact-email-link {
@@ -534,11 +607,77 @@ const ContactList = ({ contacts, isLoadingRss, isImportedList = false }) => {
           font-style: italic;
           font-size: 13px;
         }
+        
+        .source-info {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+        
+        .source-title {
+          font-size: 13px;
+          color: var(--text-primary);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 250px;
+        }
+        
+        .source-link {
+          font-size: 13px;
+          color: var(--primary);
+          text-decoration: none;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 250px;
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          transition: color 0.15s ease;
+        }
+        
+        .source-link:hover {
+          color: var(--primary-hover);
+          text-decoration: underline;
+        }
+        
+        .external-link-icon {
+          opacity: 0.7;
+          transition: opacity 0.15s ease;
+        }
+        
+        .source-link:hover .external-link-icon {
+          opacity: 1;
+        }
+        
+        .source-count {
+          font-size: 12px;
+          color: var(--text-tertiary);
+        }
 
         /* Responsive */
+        @media (max-width: 1200px) {
+          .source-column {
+            display: none;
+          }
+          
+          .name-column {
+            width: 25%;
+          }
+          
+          .role-column {
+            width: 45%;
+          }
+        }
+        
         @media (max-width: 992px) {
           .email-column {
             display: none;
+          }
+          
+          .name-column {
+            width: 30%;
           }
           
           .role-column {
