@@ -3,9 +3,13 @@ import { contactService } from "../services/contactService";
 import ContactList from "./ContactList";
 import LoadingSpinner from "./LoadingSpinner";
 
+// Stockage local pour les contacts importés (persistance entre les changements d'onglets)
+let storedImportedContacts = [];
+
 /**
  * Composant de gestion des contacts pour l'onglet Contacts
  * Permet l'extraction, l'import et l'analyse des contacts
+ * Version améliorée avec persistance des contacts entre les changements d'onglets
  * @param {Object} props - Propriétés du composant
  * @param {Array} props.combinedRelevanceMatrix - Matrice combinée de pertinence des actualités
  * @param {Object} props.data - Données de l'application
@@ -15,13 +19,16 @@ import LoadingSpinner from "./LoadingSpinner";
 const ContactTabContent = ({ combinedRelevanceMatrix, data, isLoadingRss }) => {
   // États de gestion des contacts
   const [contacts, setContacts] = useState([]);
-  const [excelContacts, setExcelContacts] = useState([]);
+  const [excelContacts, setExcelContacts] = useState(storedImportedContacts); // Utiliser la valeur stockée
   const [loading, setLoading] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("extracted");
   const [missingRoles, setMissingRoles] = useState([]);
   const [missingRoleContacts, setMissingRoleContacts] = useState([]);
   const [importError, setImportError] = useState(null);
+  
+  // État pour le contact sélectionné (pour l'affichage des détails)
+  const [selectedContact, setSelectedContact] = useState(null);
 
   // Référence pour l'input de fichier
   const fileInputRef = useRef(null);
@@ -64,6 +71,11 @@ const ContactTabContent = ({ combinedRelevanceMatrix, data, isLoadingRss }) => {
     }
   }, [data, combinedRelevanceMatrix]);
 
+  // Gestion de la sélection d'un contact
+  const handleContactSelect = (contact) => {
+    setSelectedContact(contact);
+  };
+
   // Importer des contacts depuis un fichier
   const importExcelContacts = useCallback(
     async (file) => {
@@ -85,7 +97,9 @@ const ContactTabContent = ({ combinedRelevanceMatrix, data, isLoadingRss }) => {
           combinedRelevanceMatrix
         );
 
+        // Stocker les contacts importés à la fois dans l'état local et dans la variable globale
         setExcelContacts(relevanceAnalysis);
+        storedImportedContacts = relevanceAnalysis; // Stockage pour la persistance
 
         // Identifier les rôles manquants
         const roles = contactService.identifyRolesInNews(
@@ -207,6 +221,9 @@ const ContactTabContent = ({ combinedRelevanceMatrix, data, isLoadingRss }) => {
           onClick={() => setActiveTab("imported")}
         >
           Contacts importés
+          {excelContacts.length > 0 && (
+            <span className="tab-badge">{excelContacts.length}</span>
+          )}
         </button>
         {missingRoles.length > 0 && (
           <button
@@ -228,84 +245,621 @@ const ContactTabContent = ({ combinedRelevanceMatrix, data, isLoadingRss }) => {
         </div>
       )}
 
-      {/* Contenu des onglets */}
-      {!loading && !isLoadingRss && (
-        <>
-          {activeTab === "extracted" && (
-            <ContactList contacts={contacts} isLoadingRss={isLoadingRss} />
-          )}
+      {/* Interface en deux colonnes quand un contact est sélectionné */}
+      <div className={`contacts-layout ${selectedContact ? 'with-details' : ''}`}>
+        {/* Contenu des onglets */}
+        {!loading && !isLoadingRss && (
+          <div className="contacts-main-content">
+            {activeTab === "extracted" && (
+              <ContactList 
+                contacts={contacts} 
+                isLoadingRss={isLoadingRss}
+                onContactSelect={handleContactSelect}
+              />
+            )}
 
-          {activeTab === "imported" && (
-            <ContactList
-              contacts={excelContacts}
-              isLoadingRss={isLoadingRss}
-              isImportedList={true}
-            />
-          )}
+            {activeTab === "imported" && (
+              <ContactList
+                contacts={excelContacts}
+                isLoadingRss={isLoadingRss}
+                isImportedList={true}
+                onContactSelect={handleContactSelect}
+              />
+            )}
 
-          {activeTab === "missing" && missingRoles.length > 0 && (
-            <div className="missing-roles-container">
-              <div className="missing-roles-info">
-                <p>
-                  Les rôles suivants ont été identifiés dans les actualités mais
-                  ne correspondent à aucun contact dans nos bases de données.
-                </p>
-              </div>
-              <div className="missing-roles-list">
-                {missingRoles.map((role, index) => (
-                  <div key={index} className="missing-role-item">
-                    <div className="missing-role-header">
-                      <h3>{role}</h3>
-                      <div className="potential-matches-badge">
-                        {
-                          missingRoleContacts.filter((contact) =>
+            {activeTab === "missing" && missingRoles.length > 0 && (
+              <div className="missing-roles-container">
+                <div className="missing-roles-info">
+                  <p>
+                    Les rôles suivants ont été identifiés dans les actualités mais
+                    ne correspondent à aucun contact dans nos bases de données.
+                  </p>
+                </div>
+                <div className="missing-roles-list">
+                  {missingRoles.map((role, index) => (
+                    <div key={index} className="missing-role-item">
+                      <div className="missing-role-header">
+                        <h3>{role}</h3>
+                        <div className="potential-matches-badge">
+                          {
+                            missingRoleContacts.filter((contact) =>
+                              contact.role
+                                .toLowerCase()
+                                .includes(role.toLowerCase())
+                            ).length
+                          }{" "}
+                          correspondances potentielles
+                        </div>
+                      </div>
+
+                      <div className="potential-contacts">
+                        {missingRoleContacts
+                          .filter((contact) =>
                             contact.role
                               .toLowerCase()
                               .includes(role.toLowerCase())
-                          ).length
-                        }{" "}
-                        correspondances potentielles
-                      </div>
-                    </div>
-
-                    <div className="potential-contacts">
-                      {missingRoleContacts
-                        .filter((contact) =>
-                          contact.role
-                            .toLowerCase()
-                            .includes(role.toLowerCase())
-                        )
-                        .map((contact, idx) => (
-                          <div key={idx} className="potential-contact-card">
-                            <div className="potential-contact-info">
-                              <div className="potential-contact-role">
-                                {contact.fullName || contact.name}
-                              </div>
-                              <div className="potential-contact-dept">
-                                {contact.role}
-                              </div>
-                              <div className="potential-contact-details">
-                                {contact.department && (
-                                  <div>Département: {contact.department}</div>
-                                )}
-                                {contact.email && (
-                                  <div>Email: {contact.email}</div>
-                                )}
-                                {contact.phone && (
-                                  <div>Téléphone: {contact.phone}</div>
-                                )}
+                          )
+                          .map((contact, idx) => (
+                            <div key={idx} className="potential-contact-card">
+                              <div className="potential-contact-info">
+                                <div className="potential-contact-role">
+                                  {contact.fullName || contact.name}
+                                </div>
+                                <div className="potential-contact-dept">
+                                  {contact.role}
+                                </div>
+                                <div className="potential-contact-details">
+                                  {contact.department && (
+                                    <div>Département: {contact.department}</div>
+                                  )}
+                                  {contact.email && (
+                                    <div>Email: {contact.email}</div>
+                                  )}
+                                  {contact.phone && (
+                                    <div>Téléphone: {contact.phone}</div>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Panneau de détails du contact (apparaît lorsqu'un contact est sélectionné) */}
+        {selectedContact && (
+          <div className="contact-details-panel">
+            <div className="contact-details-header">
+              <h3>Détails du contact</h3>
+              <button 
+                className="close-details-button"
+                onClick={() => setSelectedContact(null)}
+                aria-label="Fermer les détails"
+              >
+                <svg 
+                  width="20" 
+                  height="20" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path 
+                    d="M18 6L6 18" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                  />
+                  <path 
+                    d="M6 6L18 18" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="contact-details-content">
+              <div className="contact-details-avatar">
+                {(selectedContact.fullName || selectedContact.name || '').charAt(0).toUpperCase()}
+              </div>
+              
+              <h2 className="contact-details-name">
+                {selectedContact.fullName || selectedContact.name}
+              </h2>
+              
+              <div className="contact-details-role">
+                {selectedContact.role !== "Poste non spécifié" 
+                  ? selectedContact.role 
+                  : <span className="unknown-role">Rôle non spécifié</span>
+                }
+              </div>
+              
+              {selectedContact.company && (
+                <div className="contact-details-company">
+                  <label>Entreprise</label>
+                  <span>{selectedContact.company}</span>
+                </div>
+              )}
+              
+              {selectedContact.department && (
+                <div className="contact-details-info">
+                  <label>Département</label>
+                  <span>{selectedContact.department}</span>
+                </div>
+              )}
+              
+              {selectedContact.email && (
+                <div className="contact-details-info">
+                  <label>Email</label>
+                  <a 
+                    href={`mailto:${selectedContact.email}`}
+                    className="contact-details-email"
+                  >
+                    {selectedContact.email}
+                  </a>
+                </div>
+              )}
+              
+              {selectedContact.phone && (
+                <div className="contact-details-info">
+                  <label>Téléphone</label>
+                  <a 
+                    href={`tel:${selectedContact.phone}`}
+                    className="contact-details-phone"
+                  >
+                    {selectedContact.phone}
+                  </a>
+                </div>
+              )}
+              
+              {/* Sources du contact */}
+              {selectedContact.sources && selectedContact.sources.length > 0 && (
+                <div className="contact-details-sources">
+                  <label>Sources ({selectedContact.sources.length})</label>
+                  <ul className="contact-sources-list">
+                    {selectedContact.sources.map((source, idx) => (
+                      <li key={idx} className="contact-source-item">
+                        {source.link ? (
+                          <a 
+                            href={source.link} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="contact-source-link"
+                          >
+                            {source.title}
+                            <svg 
+                              width="12" 
+                              height="12" 
+                              viewBox="0 0 24 24" 
+                              fill="none" 
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="external-link-icon"
+                            >
+                              <path 
+                                d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" 
+                                stroke="currentColor" 
+                                strokeWidth="2" 
+                                strokeLinecap="round" 
+                                strokeLinejoin="round"
+                              />
+                              <path 
+                                d="M15 3h6v6" 
+                                stroke="currentColor" 
+                                strokeWidth="2" 
+                                strokeLinecap="round" 
+                                strokeLinejoin="round"
+                              />
+                              <path 
+                                d="M10 14L21 3" 
+                                stroke="currentColor" 
+                                strokeWidth="2" 
+                                strokeLinecap="round" 
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          </a>
+                        ) : (
+                          <span className="contact-source-title">
+                            {source.title}
+                          </span>
+                        )}
+                        {source.date && (
+                          <span className="contact-source-date">
+                            {source.date}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {/* Actions */}
+              <div className="contact-details-actions">
+                <a 
+                  href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(selectedContact.fullName || selectedContact.name)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="linkedin-search-button"
+                >
+                  <svg 
+                    width="16" 
+                    height="16" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <rect
+                      x="2"
+                      y="9"
+                      width="4"
+                      height="12"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <circle
+                      cx="4"
+                      cy="4"
+                      r="2"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  Rechercher sur LinkedIn
+                </a>
+                
+                {selectedContact.email && (
+                  <a 
+                    href={`mailto:${selectedContact.email}`}
+                    className="email-button"
+                  >
+                    <svg 
+                      width="16" 
+                      height="16" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path 
+                        d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" 
+                        stroke="currentColor" 
+                        strokeWidth="2" 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round"
+                      />
+                      <polyline 
+                        points="22,6 12,13 2,6" 
+                        stroke="currentColor" 
+                        strokeWidth="2" 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    Envoyer un email
+                  </a>
+                )}
               </div>
             </div>
-          )}
-        </>
-      )}
+          </div>
+        )}
+      </div>
+
+      {/* Styles pour le nouvel agencement et le panneau de détails */}
+      <style jsx>{`
+        .contacts-layout {
+          display: flex;
+          gap: 24px;
+          position: relative;
+        }
+        
+        .contacts-layout.with-details .contacts-main-content {
+          width: 70%;
+        }
+        
+        .contacts-main-content {
+          flex: 1;
+          transition: width 0.3s ease;
+        }
+        
+        .contact-details-panel {
+          width: 30%;
+          min-width: 300px;
+          background-color: var(--glass-bg);
+          backdrop-filter: blur(15px);
+          -webkit-backdrop-filter: blur(15px);
+          border-radius: var(--border-radius-lg);
+          border: 1px solid var(--glass-border);
+          box-shadow: var(--glass-shadow-md);
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+          animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translateX(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        
+        .contact-details-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 16px;
+          border-bottom: 1px solid var(--divider);
+        }
+        
+        .contact-details-header h3 {
+          margin: 0;
+          font-size: 16px;
+          font-weight: 600;
+          color: var(--text-secondary);
+        }
+        
+        .close-details-button {
+          background: none;
+          border: none;
+          cursor: pointer;
+          color: var(--text-tertiary);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          transition: all 0.2s ease;
+        }
+        
+        .close-details-button:hover {
+          background-color: rgba(0, 0, 0, 0.05);
+          color: var(--text-secondary);
+        }
+        
+        .contact-details-content {
+          padding: 24px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+        }
+        
+        .contact-details-avatar {
+          width: 80px;
+          height: 80px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, var(--primary), var(--secondary));
+          color: white;
+          font-size: 36px;
+          font-weight: 500;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 16px;
+          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .contact-details-name {
+          font-size: 24px;
+          font-weight: 600;
+          margin: 0 0 8px 0;
+          color: var(--text-primary);
+        }
+        
+        .contact-details-role {
+          font-size: 16px;
+          color: var(--text-secondary);
+          margin-bottom: 24px;
+        }
+        
+        .unknown-role {
+          font-style: italic;
+          color: var(--text-tertiary);
+        }
+        
+        .contact-details-company {
+          width: 100%;
+          margin-bottom: 16px;
+          padding-bottom: 16px;
+          border-bottom: 1px solid var(--divider);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+        }
+        
+        .contact-details-company label,
+        .contact-details-info label,
+        .contact-details-sources label {
+          font-size: 12px;
+          text-transform: uppercase;
+          color: var(--text-tertiary);
+          margin-bottom: 4px;
+          letter-spacing: 0.5px;
+        }
+        
+        .contact-details-company span {
+          font-weight: 500;
+          color: var(--text-primary);
+        }
+        
+        .contact-details-info {
+          width: 100%;
+          margin-bottom: 16px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+        }
+        
+        .contact-details-email,
+        .contact-details-phone {
+          color: var(--primary);
+          text-decoration: none;
+          transition: color 0.2s ease;
+        }
+        
+        .contact-details-email:hover,
+        .contact-details-phone:hover {
+          color: var(--primary-hover);
+          text-decoration: underline;
+        }
+        
+        .contact-details-sources {
+          width: 100%;
+          margin-top: 8px;
+          margin-bottom: 24px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+        }
+        
+        .contact-sources-list {
+          list-style: none;
+          padding: 0;
+          margin: 8px 0 0 0;
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          max-height: 200px;
+          overflow-y: auto;
+        }
+        
+        .contact-source-item {
+          background-color: rgba(255, 255, 255, 0.5);
+          border-radius: var(--border-radius);
+          padding: 8px 12px;
+          font-size: 13px;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          text-align: left;
+        }
+        
+        .contact-source-link,
+        .contact-source-title {
+          color: var(--text-primary);
+          font-weight: 500;
+          margin-bottom: 4px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          width: 100%;
+          white-space: nowrap;
+        }
+        
+        .contact-source-link {
+          text-decoration: none;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          color: var(--primary);
+        }
+        
+        .contact-source-link:hover {
+          text-decoration: underline;
+        }
+        
+        .contact-source-date {
+          font-size: 12px;
+          color: var(--text-tertiary);
+        }
+        
+        .contact-details-actions {
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        
+        .linkedin-search-button,
+        .email-button {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          padding: 10px 16px;
+          border-radius: var(--border-radius);
+          font-size: 14px;
+          font-weight: 500;
+          text-decoration: none;
+          transition: all 0.2s ease;
+        }
+        
+        .linkedin-search-button {
+          background-color: #0077B5;
+          color: white;
+        }
+        
+        .linkedin-search-button:hover {
+          background-color: #006097;
+        }
+        
+        .email-button {
+          background-color: var(--primary);
+          color: white;
+        }
+        
+        .email-button:hover {
+          background-color: var(--primary-hover);
+        }
+        
+        /* Style pour le badge du nombre de contacts importés */
+        .tab-badge {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background-color: var(--primary);
+          color: white;
+          font-size: 12px;
+          font-weight: 500;
+          height: 18px;
+          min-width: 18px;
+          border-radius: 9px;
+          padding: 0 6px;
+          margin-left: 8px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 992px) {
+          .contacts-layout.with-details {
+            flex-direction: column;
+          }
+          
+          .contacts-layout.with-details .contacts-main-content {
+            width: 100%;
+          }
+          
+          .contact-details-panel {
+            width: 100%;
+            min-width: auto;
+            order: -1;
+            margin-bottom: 24px;
+          }
+        }
+      `}</style>
     </div>
   );
 };
