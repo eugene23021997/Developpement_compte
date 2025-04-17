@@ -3,6 +3,7 @@ import LoadingSpinner from "./LoadingSpinner";
 
 /**
  * Composant pour afficher une liste de contacts avec filtres et actions
+ * Version améliorée avec un design plus harmonieux et user-friendly
  * @param {Object} props - Propriétés du composant
  * @param {Array} props.contacts - Liste des contacts à afficher
  * @param {boolean} props.isLoadingRss - Indicateur de chargement des flux RSS
@@ -56,7 +57,8 @@ const ContactList = ({ contacts, isLoadingRss, isImportedList = false }) => {
         contact.role.toLowerCase().includes(searchText) ||
         (contact.department &&
           contact.department.toLowerCase().includes(searchText)) ||
-        (contact.company && contact.company.toLowerCase().includes(searchText));
+        (contact.company && contact.company.toLowerCase().includes(searchText)) ||
+        (contact.email && contact.email.toLowerCase().includes(searchText));
 
       // Filtre "sélectionnés uniquement"
       const isSelected = selectedContacts.includes(
@@ -116,13 +118,12 @@ const ContactList = ({ contacts, isLoadingRss, isImportedList = false }) => {
 
     // Créer les entêtes CSV
     const headers = [
-      "Nom",
-      "Rôle",
-      "Entreprise",
-      "Score de confiance",
-      "Département",
+      "Full Name",
+      "Role",
       "Email",
-      "Téléphone",
+      "Company",
+      "Department",
+      "Phone",
       "Sources",
     ];
 
@@ -130,10 +131,9 @@ const ContactList = ({ contacts, isLoadingRss, isImportedList = false }) => {
     const rows = contactsToExport.map((contact) => [
       contact.fullName || contact.name,
       contact.role,
-      contact.company,
-      contact.confidenceScore.toFixed(2),
-      contact.department || "",
       contact.email || "",
+      contact.company,
+      contact.department || "",
       contact.phone || "",
       (contact.sources || []).map((s) => s.title).join(" | "),
     ]);
@@ -157,22 +157,6 @@ const ContactList = ({ contacts, isLoadingRss, isImportedList = false }) => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
-
-  // Fonction utilitaire pour obtenir la classe de confiance
-  const getConfidenceClass = (score) => {
-    if (score >= 0.9) return "confidence-very-high";
-    if (score >= 0.7) return "confidence-high";
-    if (score >= 0.5) return "confidence-medium";
-    return "confidence-low";
-  };
-
-  // Fonction de troncature de texte
-  const truncateText = (text, maxLength = 60) => {
-    if (!text) return "";
-    return text.length > maxLength
-      ? `${text.substring(0, maxLength)}...`
-      : text;
   };
 
   return (
@@ -324,121 +308,76 @@ const ContactList = ({ contacts, isLoadingRss, isImportedList = false }) => {
       </div>
 
       {filteredContacts.length > 0 ? (
-        <div className="premium-contacts-container">
-          <div className="premium-contacts-header-row">
-            <div className="premium-contact-checkbox">
-              <input
-                type="checkbox"
-                checked={
-                  selectedContacts.length === filteredContacts.length &&
-                  filteredContacts.length > 0
-                }
-                onChange={toggleSelectAll}
-                id="selectAll"
-                className="premium-checkbox"
-              />
-              <label htmlFor="selectAll" className="premium-checkbox-label">
-                Tout sélectionner
-              </label>
-            </div>
-            <div className="premium-contact-name-header">Nom</div>
-            <div className="premium-contact-role-header">Rôle</div>
-            <div className="premium-contact-score-header">Confiance</div>
-            <div className="premium-contact-sources-header">Sources</div>
-          </div>
-
-          <div className="premium-contacts-list">
-            {filteredContacts.map((contact, index) => (
-              <div
-                key={`${contact.name || contact.fullName}-${index}`}
-                className={`premium-contact-card ${
-                  selectedContacts.includes(contact.name || contact.fullName)
-                    ? "selected"
-                    : ""
-                }`}
-              >
-                <div className="premium-contact-checkbox">
+        <div className="premium-contacts-table-wrapper">
+          <table className="premium-contacts-table">
+            <thead>
+              <tr>
+                <th className="select-column">
                   <input
                     type="checkbox"
-                    checked={selectedContacts.includes(
-                      contact.name || contact.fullName
-                    )}
-                    onChange={() => toggleContactSelection(contact)}
-                    id={`contact-${index}`}
+                    checked={
+                      selectedContacts.length === filteredContacts.length &&
+                      filteredContacts.length > 0
+                    }
+                    onChange={toggleSelectAll}
+                    id="selectAll"
                     className="premium-checkbox"
                   />
-                  <label
-                    htmlFor={`contact-${index}`}
-                    className="premium-checkbox-label visually-hidden"
-                  >
-                    Sélectionner {contact.name || contact.fullName}
+                  <label htmlFor="selectAll" className="premium-checkbox-label visually-hidden">
+                    Tout sélectionner
                   </label>
-                </div>
-
-                <div className="premium-contact-name">
-                  <span>{contact.fullName || contact.name}</span>
-                  <span className="premium-contact-company">
-                    {contact.company || ""}
-                  </span>
-                </div>
-
-                <div className="premium-contact-role">
-                  {contact.role === "Poste non spécifié" ? (
-                    <span className="premium-contact-unknown-role">
-                      Rôle non spécifié
-                    </span>
-                  ) : (
-                    contact.role
-                  )}
-                </div>
-
-                <div className="premium-contact-score">
-                  <div
-                    className={`premium-confidence-badge ${getConfidenceClass(
-                      contact.confidenceScore
-                    )}`}
-                    title={`Score de confiance: ${(
-                      contact.confidenceScore * 100
-                    ).toFixed(0)}%`}
-                  >
-                    {(contact.confidenceScore * 100).toFixed(0)}%
-                  </div>
-                </div>
-
-                <div className="premium-contact-sources">
-                  {contact.sources && contact.sources.length > 0 ? (
-                    contact.sources.map((source, srcIdx) => (
-                      <div key={srcIdx} className="premium-contact-source">
-                        {source.link ? (
-                          <a
-                            href={source.link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="premium-contact-source-link"
-                            title={source.title}
-                          >
-                            {truncateText(source.title, 60)}
-                            <span className="premium-contact-source-date">
-                              {source.date}
-                            </span>
-                          </a>
-                        ) : (
-                          <span title={source.title}>
-                            {truncateText(source.title, 60)}
-                            <span className="premium-contact-source-date">
-                              {source.date}
-                            </span>
-                          </span>
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <span className="premium-contact-empty">Aucune source</span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+                </th>
+                <th className="name-column">Full Name</th>
+                <th className="role-column">Role</th>
+                <th className="email-column">Email</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredContacts.map((contact, index) => (
+                <tr 
+                  key={`${contact.name || contact.fullName}-${index}`}
+                  className={selectedContacts.includes(contact.name || contact.fullName) ? "selected-row" : ""}
+                >
+                  <td className="select-column">
+                    <input
+                      type="checkbox"
+                      checked={selectedContacts.includes(
+                        contact.name || contact.fullName
+                      )}
+                      onChange={() => toggleContactSelection(contact)}
+                      id={`contact-${index}`}
+                      className="premium-checkbox"
+                    />
+                    <label
+                      htmlFor={`contact-${index}`}
+                      className="premium-checkbox-label visually-hidden"
+                    >
+                      Sélectionner {contact.name || contact.fullName}
+                    </label>
+                  </td>
+                  <td className="name-column">{contact.fullName || contact.name}</td>
+                  <td className="role-column">
+                    {contact.role === "Poste non spécifié" ? (
+                      <span className="premium-contact-unknown-role">
+                        Rôle non spécifié
+                      </span>
+                    ) : (
+                      contact.role
+                    )}
+                  </td>
+                  <td className="email-column">
+                    {contact.email ? (
+                      <a href={`mailto:${contact.email}`} className="contact-email-link">
+                        {contact.email}
+                      </a>
+                    ) : (
+                      <span className="premium-contact-empty">Email non disponible</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : (
         <div className="empty-state">
@@ -501,6 +440,141 @@ const ContactList = ({ contacts, isLoadingRss, isImportedList = false }) => {
           )}
         </div>
       )}
+
+      {/* Style amélioré pour le tableau de contacts */}
+      <style jsx>{`
+        .premium-contacts-table-wrapper {
+          border-radius: 12px;
+          overflow: hidden;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+          background: var(--surface);
+          margin-bottom: 24px;
+        }
+        
+        .premium-contacts-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 14px;
+        }
+        
+        .premium-contacts-table th {
+          background-color: var(--glass-bg);
+          color: var(--text-secondary);
+          font-weight: 600;
+          text-align: left;
+          padding: 16px;
+          position: sticky;
+          top: 0;
+          z-index: 10;
+          border-bottom: 1px solid var(--divider);
+        }
+        
+        .premium-contacts-table td {
+          padding: 12px 16px;
+          border-bottom: 1px solid var(--divider);
+          vertical-align: middle;
+        }
+        
+        .premium-contacts-table tbody tr {
+          transition: background-color 0.15s ease;
+        }
+        
+        .premium-contacts-table tbody tr:hover {
+          background-color: rgba(0, 113, 243, 0.04);
+        }
+        
+        .premium-contacts-table tbody tr.selected-row {
+          background-color: rgba(0, 113, 243, 0.08);
+        }
+        
+        .premium-contacts-table tbody tr.selected-row:hover {
+          background-color: rgba(0, 113, 243, 0.12);
+        }
+        
+        .select-column {
+          width: 48px;
+          text-align: center;
+        }
+        
+        .name-column {
+          width: 20%;
+          min-width: 180px;
+          font-weight: 500;
+        }
+        
+        .role-column {
+          width: 50%;
+        }
+        
+        .email-column {
+          width: 30%;
+          min-width: 200px;
+        }
+        
+        .contact-email-link {
+          color: var(--primary);
+          text-decoration: none;
+          transition: color 0.15s ease;
+          font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+          font-size: 13px;
+        }
+        
+        .contact-email-link:hover {
+          color: var(--primary-hover);
+          text-decoration: underline;
+        }
+        
+        .premium-contact-unknown-role {
+          color: var(--text-tertiary);
+          font-style: italic;
+        }
+        
+        .premium-contact-empty {
+          color: var(--text-tertiary);
+          font-style: italic;
+          font-size: 13px;
+        }
+
+        /* Responsive */
+        @media (max-width: 992px) {
+          .email-column {
+            display: none;
+          }
+          
+          .role-column {
+            width: 70%;
+          }
+        }
+        
+        @media (max-width: 768px) {
+          .premium-contacts-table th,
+          .premium-contacts-table td {
+            padding: 12px 8px;
+          }
+          
+          .name-column {
+            min-width: 120px;
+          }
+        }
+        
+        @media (max-width: 576px) {
+          .premium-contacts-table-wrapper {
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+          }
+          
+          .premium-contacts-table {
+            font-size: 13px;
+          }
+          
+          .role-column {
+            max-width: 200px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+        }
+      `}</style>
     </>
   );
 };
