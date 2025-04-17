@@ -6,30 +6,38 @@
 
 import * as XLSX from "xlsx";
 
-// Expressions régulières pour identifier les noms et titres
+// Expressions régulières pour identifier les noms et titres - OPTIMISÉES
 const PATTERNS = {
-  // Modèle : [Prénom Nom], [Titre/Fonction]
+  // Modèle : [Prénom Nom], [Titre/Fonction] - moins restrictif
   PERSON_WITH_TITLE:
-    /([A-Z][a-zÀ-ÿ]+(?:\s[A-Z][a-zÀ-ÿ]+)+)\s*,\s*((?:[^,.]|[dD]'|[dD]e\s)+(?:directeur|directrice|président|présidente|CEO|PDG|DG|DSI|CFO|CTO|CDO|CIO|CHRO|COO|CMO|vice-président|VP|responsable|manager|chef|head|leader|dirigeant|fondateur|fondatrice|chief|officer|executive)\s+(?:[^,.])+)/gi,
+    /([A-Z][a-zÀ-ÿ]+(?:\s+[A-Z][a-zÀ-ÿ]+)+)\s*,\s*((?:[^,.;:]+\s+)?(?:directeur|directrice|président|présidente|CEO|PDG|DG|DSI|CFO|CTO|CDO|CIO|CHRO|COO|CMO|vice[-\s]président|VP|responsable|manager|chef|head|leader|dirigeant|fondateur|fondatrice|chief|officer|executive)(?:\s+[^,.;:]+)*)/gi,
 
-  // Pour les cas comme "M. Dupont, Directeur..."
+  // Pour les cas comme "M. Dupont, Directeur..." - moins restrictif
   PERSON_WITH_TITLE_MR_MRS:
-    /(?:M\.|Mme|Mlle|Mr\.|Mrs\.|Ms\.)\s+([A-Z][a-zÀ-ÿ]+(?:\s[A-Z][a-zÀ-ÿ]+)*)\s*,\s*((?:[^,.]|[dD]'|[dD]e\s)+(?:directeur|directrice|président|présidente|CEO|PDG|DG|DSI|CFO|CTO|CDO|CIO|CHRO|COO|CMO|vice-président|VP|responsable|manager|chef|head|leader|dirigeant|fondateur|fondatrice|chief|officer|executive)\s+(?:[^,.])+)/gi,
+    /(?:M\.|Mme\.?|Mlle\.?|Mr\.?|Mrs\.?|Ms\.?)\s+([A-Z][a-zÀ-ÿ]+(?:\s+[A-Z][a-zÀ-ÿ]+)*)\s*,\s*((?:[^,.;:]+\s+)?(?:directeur|directrice|président|présidente|CEO|PDG|DG|DSI|CFO|CTO|CDO|CIO|CHRO|COO|CMO|vice[-\s]président|VP|responsable|manager|chef|head|leader|dirigeant|fondateur|fondatrice|chief|officer|executive)(?:\s+[^,.;:]+)*)/gi,
 
-  // Motifs comme "Directeur X, Jean Dupont"
+  // Motifs comme "Directeur X, Jean Dupont" - moins restrictif
   TITLE_THEN_PERSON:
-    /((?:directeur|directrice|président|présidente|CEO|PDG|DG|DSI|CFO|CTO|CDO|CIO|CHRO|COO|CMO|vice-président|VP|responsable|manager|chef|head|leader|dirigeant|fondateur|fondatrice|chief|officer|executive)\s+(?:[^,.])+),\s+([A-Z][a-zÀ-ÿ]+(?:\s[A-Z][a-zÀ-ÿ]+)+)/gi,
+    /((?:directeur|directrice|président|présidente|CEO|PDG|DG|DSI|CFO|CTO|CDO|CIO|CHRO|COO|CMO|vice[-\s]président|VP|responsable|manager|chef|head|leader|dirigeant|fondateur|fondatrice|chief|officer|executive)(?:\s+[^,.;:]+)*),\s+([A-Z][a-zÀ-ÿ]+(?:\s+[A-Z][a-zÀ-ÿ]+)+)/gi,
     
-  // Modèle spécifique pour les podcasts
+  // Modèle pour les podcasts et interviews - plus permissif
   PODCAST_PERSON_TITLE:
-    /\[Podcast\].*?(?:with|avec|featuring|feat\.?|host(?:ed)? by)\s+([A-Z][a-zÀ-ÿ]+(?:\s[A-Z][a-zÀ-ÿ]+){1,2})(?:\s*,\s*((?:Chief|Director|Head|Manager|VP|Directeur|Président|CEO|CIO|CTO|CDO|CFO|CSO)[^,.;:]*)?)?/i,
+    /(?:podcast|interview|entretien|webinar|webinaire).*?(?:with|avec|featuring|feat\.?|host(?:ed)? by|par)\s+([A-Z][a-zÀ-ÿ]+(?:\s+[A-Z][a-zÀ-ÿ]+){1,3})(?:\s*[,(-]\s*((?:Chief|Director|Head|Manager|VP|Directeur|Président|CEO|CIO|CTO|CDO|CFO|CSO)[^,.;:()]*)?)?/i,
     
-  // Modèle pour "Prénom Nom est (le nouveau) Titre"
+  // Modèle pour "Prénom Nom est (le nouveau) Titre" - moins restrictif
   NAMED_AS_TITLE:
-    /([A-Z][a-zÀ-ÿ]+(?:\s[A-Z][a-zÀ-ÿ]+){1,2})\s+(?:est|is|devient|a été nommé|nommé)\s+(?:le\s+|la\s+|l['\u2019]\s*)?(?:nouveau|nouvelle|new)?\s+((?:directeur|directrice|président|présidente|CEO|PDG|DG|DSI|CFO|CTO|CDO|CIO|CHRO|COO|CMO|vice-président|VP|responsable|manager|chef|head|leader|dirigeant|fondateur|fondatrice|chief|officer|executive)(?:\s+[^,.;:]+){0,3})/i,
+    /([A-Z][a-zÀ-ÿ]+(?:\s+[A-Z][a-zÀ-ÿ]+){1,3})\s+(?:est|is|devient|a été nommé|nommé|appointed|becomes|named)\s+(?:le\s+|la\s+|l['\u2019]\s*)?(?:nouveau|nouvelle|new)?\s+((?:directeur|directrice|président|présidente|CEO|PDG|DG|DSI|CFO|CTO|CDO|CIO|CHRO|COO|CMO|vice[-\s]président|VP|responsable|manager|chef|head|leader|dirigeant|fondateur|fondatrice|chief|officer|executive)(?:\s+[^,.;:]+){0,5})/i,
+    
+  // NOUVEAU: Modèle pour "Prénom Nom, Titre de Company" 
+  PERSON_COMPANY_TITLE:
+    /([A-Z][a-zÀ-ÿ]+(?:\s+[A-Z][a-zÀ-ÿ]+)+)[\s,]+(?:(?:directeur|directrice|président|présidente|CEO|PDG|DG|DSI|CFO|CTO|CDO|CIO|CHRO|COO|CMO|vice[-\s]président|VP|responsable|manager|chef|head|leader|dirigeant|fondateur|fondatrice|chief|officer|executive)(?:\s+[^,.;:]+){0,5})\s+(?:de|chez|at|pour|of|from|à|au)\s+(?:Schneider|Electric|SE)/i,
+    
+  // Nouveau: Détection simple des noms suivis de "de Schneider Electric"
+  PERSON_OF_SCHNEIDER:
+    /([A-Z][a-zÀ-ÿ]+(?:\s+[A-Z][a-zÀ-ÿ]+){1,3})(?:\s*[,(]([^,.;:()]{5,50})?[,)]?)?\s+(?:de|chez|at|pour|of|from|à|au)\s+(?:Schneider|Electric|SE)/i,
     
   // Pour les "Chief Digital Officer" et postes similaires
-  EXECUTIVE_TITLE: /\b(Chief\s+[A-Z][a-z]+\s+Officer)\b/gi,
+  EXECUTIVE_TITLE: /\b(Chief\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\s+Officer)\b/gi,
 };
 
 // Liste de titres/postes valides
@@ -104,27 +112,18 @@ const COMPLETE_TITLES = [
   "Directeur des Ressources Humaines"
 ];
 
-// Mots qui ne sont pas des noms de personnes mais qu'on pourrait confondre
+// Mots qui ne sont pas des noms de personnes mais qu'on pourrait confondre - RÉDUIT pour être moins restrictif
 const NON_PERSON_WORDS = [
-  "uninterruptible", "power", "supply", "ups", "battery", 
-  "global", "opportunities", "discover", "cavite", "beacon",
-  "hub", "signs", "time", "replace", "digital", "impact", 
-  "making", "officer", "chief", "podcast", "press", "release", 
+  "uninterruptible", "power", "supply", "ups", 
+  "podcast", "press", "release", 
   "communiqué", "presse", "webinar", "webinaire", "replay", 
-  "announcement", "annonce", "corporate", "entreprise"
+  "announcement", "annonce"
 ];
 
-// Entités connues à exclure (faux positifs)
+// Entités connues à exclure (faux positifs) - RÉDUIT pour être moins restrictif
 const KNOWN_ENTITIES = [
   "Schneider Electric", "BearingPoint", "Microsoft", "Google", "Apple", "Amazon",
-  "Accenture", "Capgemini", "Deloitte", "KPMG", "EY", "PWC", "IBM", "Oracle", "SAP",
-  "Salesforce", "Siemens", "ABB", "General Electric", "Legrand", "Eaton", "France",
-  "Europe", "États-Unis", "États Unis", "Etats-Unis", "Etats Unis", "Paris", "Lyon", 
-  "Grenoble", "Commission Européenne", "Union Européenne", "Nations Unies", "ONU", 
-  "Parlement", "evolving world", "industrial automation", "staying ahead", "curve",
-  "Business Applications", "Data", "Analytics and AI", "Operations", "People & Strategy", 
-  "Demand Management", "The future in motion", "Flexible", "agile operations",
-  "Chief Digital", "Directeur Général", "Chief Executive"
+  "Accenture", "Capgemini", "Deloitte", "KPMG", "EY", "PWC", "IBM", "Oracle", "SAP"
 ];
 
 /**
@@ -152,28 +151,105 @@ class ContactService {
     }
     
     // Vérifier s'il s'agit d'un podcast
-    if (cleanText.toLowerCase().includes("[podcast]")) {
+    if (cleanText.toLowerCase().includes("[podcast]") || 
+        cleanText.toLowerCase().includes("interview") ||
+        cleanText.toLowerCase().includes("webinar")) {
       this._extractFromPodcast(cleanText, contacts, processedNames, company);
     }
     
     // Identifier les "Chief X Officer" complets
     this._extractExecutiveTitles(cleanText, contacts, processedNames, company);
     
-    // Modèles standards
+    // Modèles standards - NOUVEAU: Ordre optimisé du plus précis au moins précis
+    this._extractWithPattern(PATTERNS.NAMED_AS_TITLE, cleanText, contacts, processedNames, 0.95, company);
     this._extractWithPattern(PATTERNS.PERSON_WITH_TITLE, cleanText, contacts, processedNames, 0.9, company);
     this._extractWithPattern(PATTERNS.PERSON_WITH_TITLE_MR_MRS, cleanText, contacts, processedNames, 0.85, company, 1);
     this._extractWithPattern(PATTERNS.TITLE_THEN_PERSON, cleanText, contacts, processedNames, 0.8, company, 2, 1);
-    this._extractWithPattern(PATTERNS.NAMED_AS_TITLE, cleanText, contacts, processedNames, 0.95, company);
     
-    // Filtrer les faux positifs
-    return this._filterFalsePositives(contacts);
+    // NOUVEAU: Patrons spécifiques à Schneider Electric
+    this._extractWithPattern(PATTERNS.PERSON_COMPANY_TITLE, cleanText, contacts, processedNames, 0.9, company);
+    this._extractWithPattern(PATTERNS.PERSON_OF_SCHNEIDER, cleanText, contacts, processedNames, 0.7, company);
+    
+    // NOUVEAU: Rechercher des emails dans le texte et les associer aux contacts le cas échéant
+    this._extractAndAssociateEmails(cleanText, contacts);
+    
+    // Filtrer les faux positifs mais MOINS STRICT
+    return this._filterFalsePositives(contacts, false);
+  }
+  
+  /**
+   * NOUVEAU: Extrait les adresses email du texte et les associe aux contacts existants
+   */
+  _extractAndAssociateEmails(text, contacts) {
+    // Regex pour trouver les adresses email
+    const emailRegex = /[a-zA-Z0-9._%+-]+@(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}/g;
+    const emails = [...text.matchAll(emailRegex)].map(match => match[0]);
+    
+    if (emails.length === 0) return;
+    
+    // Tenter d'associer les emails aux contacts par nom
+    emails.forEach(email => {
+      // Extraire le nom potentiel de l'email (ex: jean.dupont@schneider-electric.com -> jean dupont)
+      const namePart = email.split('@')[0];
+      const namePieces = namePart.split(/[._-]/);
+      
+      if (namePieces.length > 1) {
+        // Créer différentes versions du nom
+        const possibleFirstName = namePieces[0];
+        const possibleLastName = namePieces[1];
+        
+        // Essayer de trouver un contact correspondant
+        for (const contact of contacts) {
+          // Normaliser le nom pour la comparaison (sans accents, en minuscules)
+          const normalizedContactName = contact.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+          
+          // Vérifier si le nom dans l'email correspond au contact
+          if (normalizedContactName.includes(possibleFirstName.toLowerCase()) && 
+              normalizedContactName.includes(possibleLastName.toLowerCase())) {
+            contact.email = email;
+            contact.confidenceScore = Math.min(1.0, contact.confidenceScore + 0.1); // Augmenter la confiance
+            break;
+          }
+        }
+      }
+      
+      // Si aucun contact n'a été associé et l'email est de Schneider Electric, 
+      // ajouter un contact générique avec cette adresse
+      if (!contacts.some(c => c.email === email) && 
+          (email.includes('schneider') || email.includes('se.com'))) {
+        
+        // Tenter de générer un nom à partir de l'email
+        const namePart = email.split('@')[0];
+        const namePieces = namePart.split(/[._-]/);
+        
+        let generatedName = '';
+        if (namePieces.length >= 2) {
+          generatedName = namePieces.map(part => 
+            part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
+          ).join(' ');
+        }
+        
+        if (generatedName && !processedNames.has(generatedName.toLowerCase())) {
+          contacts.push({
+            name: generatedName,
+            role: "Poste non spécifié",
+            email: email,
+            company: "Schneider Electric", 
+            confidenceScore: 0.6,
+            context: `Email extrait: ${email}`
+          });
+          
+          processedNames.add(generatedName.toLowerCase());
+        }
+      }
+    });
   }
   
   /**
    * Vérifie si un texte ressemble à un titre d'article annonçant une nomination
    */
   _isNominationTitle(text) {
-    return /([A-Z][a-zÀ-ÿ]+(?:\s[A-Z][a-zÀ-ÿ]+){1,2})\s+(?:est|is|devient|a été nommé)\s+(?:le\s+|la\s+|l')?(?:nouveau|nouvelle)?\s+(?:directeur|directrice|président|CEO|PDG)/i.test(text);
+    return /([A-Z][a-zÀ-ÿ]+(?:\s+[A-Z][a-zÀ-ÿ]+){1,3})\s+(?:est|is|devient|a été nommé|appointed|becomes|named)\s+(?:le\s+|la\s+|l')?(?:nouveau|nouvelle|new)?\s+(?:directeur|directrice|président|CEO|PDG)/i.test(text);
   }
   
   /**
@@ -185,8 +261,8 @@ class ContactService {
       const name = match[1].trim();
       let role = match[2].trim();
       
-      // Vérifier que le nom et le rôle ont du sens
-      if (this._isValidPersonName(name) && !this._containsNonPersonWords(name)) {
+      // Vérifier que le nom et le rôle ont du sens - MOINS STRICT
+      if (this._isValidPersonName(name, true)) {
         role = this._normalizeTitle(role);
         
         processedNames.add(name.toLowerCase());
@@ -212,8 +288,8 @@ class ContactService {
       // Si on n'a pas extrait de titre ou si c'est vide
       let role = match[2] ? match[2].trim() : null;
       
-      // Si on a un nom mais pas de rôle précis trouvé dans le titre
-      if (this._isValidPersonName(name) && !this._containsNonPersonWords(name)) {
+      // Si on a un nom mais pas de rôle précis trouvé dans le titre - MOINS STRICT
+      if (this._isValidPersonName(name, true)) {
         if (!role) {
           // Pour un podcast, chercher dans le texte s'il y a des informations sur le rôle
           // Par exemple: "Peter Weckesser, Chief Digital Officer" dans le contenu
@@ -267,8 +343,8 @@ class ContactService {
       const fullTitle = match[1];
       
       // Chercher les noms à proximité du titre
-      const contextStart = Math.max(0, match.index - 50);
-      const contextEnd = Math.min(text.length, match.index + match[0].length + 50);
+      const contextStart = Math.max(0, match.index - 100);  // ÉLARGI: augmenté de 50 à 100
+      const contextEnd = Math.min(text.length, match.index + match[0].length + 100);  // ÉLARGI
       const context = text.substring(contextStart, contextEnd);
       
       // Chercher un nom propre: commence par majuscule, suivi d'une ou plusieurs lettres minuscules
@@ -277,9 +353,8 @@ class ContactService {
       for (const nameMatch of nameMatches) {
         const potentialName = nameMatch[1].trim();
         
-        // Vérifier si c'est un nom valide et pas un mot non-personne
-        if (this._isValidPersonName(potentialName) && 
-            !this._containsNonPersonWords(potentialName) &&
+        // Vérifier si c'est un nom valide et pas un mot non-personne - MOINS STRICT
+        if (this._isValidPersonName(potentialName, true) && 
             !processedNames.has(potentialName.toLowerCase())) {
           
           // Ajouter le contact
@@ -317,10 +392,10 @@ class ContactService {
     
     for (const match of matches) {
       const name = match[nameIndex].trim();
-      const role = match[roleIndex].trim();
+      const role = match[roleIndex] ? match[roleIndex].trim() : "Poste non spécifié";
       
-      // Vérifier que c'est un nom valide et non une fausse détection
-      if (this._isValidPersonName(name) && !this._containsNonPersonWords(name)) {
+      // Vérifier que c'est un nom valide - MOINS STRICT
+      if (this._isValidPersonName(name, true)) {
         
         // Normaliser le rôle pour les formats standards
         const normalizedRole = this._normalizeTitle(role);
@@ -335,8 +410,8 @@ class ContactService {
             confidenceScore: baseConfidence,
             company,
             context: text.substring(
-              Math.max(0, match.index - 30),
-              Math.min(text.length, match.index + match[0].length + 30)
+              Math.max(0, match.index - 50),  // ÉLARGI: augmenté de 30 à 50
+              Math.min(text.length, match.index + match[0].length + 50)  // ÉLARGI
             )
           });
         }
@@ -346,8 +421,10 @@ class ContactService {
   
   /**
    * Vérifie si un nom semble être un nom de personne valide
+   * @param {string} name - Le nom à vérifier
+   * @param {boolean} lessStrict - Si true, applique des règles moins strictes
    */
-  _isValidPersonName(name) {
+  _isValidPersonName(name, lessStrict = false) {
     if (!name || typeof name !== 'string') return false;
     
     // Doit contenir au moins deux mots
@@ -355,26 +432,47 @@ class ContactService {
     if (words.length < 2) return false;
     
     // Chaque mot doit commencer par une majuscule suivie de minuscules
-    const validNameFormat = words.every(word => /^[A-ZÀ-Ý][a-zà-ÿ]+$/.test(word));
+    // MOINS STRICT: en mode moins strict, on permet certaines exceptions
+    let validNameFormat;
+    if (lessStrict) {
+      validNameFormat = words.every(word => /^[A-ZÀ-Ý][a-zà-ÿ]{1,}$/.test(word) || 
+                                         /^[A-ZÀ-Ý][a-zà-ÿ]+-[A-ZÀ-Ý]?[a-zà-ÿ]+$/.test(word)); // Permet les noms composés
+    } else {
+      validNameFormat = words.every(word => /^[A-ZÀ-Ý][a-zà-ÿ]+$/.test(word));
+    }
     
-    // Exclure les entités connues
+    // Exclure les entités connues - MOINS STRICT
     const isKnownEntity = KNOWN_ENTITIES.some(entity => 
-      name.toLowerCase().includes(entity.toLowerCase()) || 
-      entity.toLowerCase().includes(name.toLowerCase())
+      name.toLowerCase() === entity.toLowerCase() || 
+      (name.split(/\s+/).length <= 2 && entity.toLowerCase().includes(name.toLowerCase()))
     );
     
     // Vérifier la longueur du nom (ni trop court ni trop long)
-    const validLength = name.length >= 5 && name.length <= 40;
+    // MOINS STRICT: Augmenter la limite supérieure
+    const validLength = name.length >= 5 && name.length <= 50;
+    
+    // MOINS STRICT: simplification des règles
+    if (lessStrict) {
+      // Si c'est un format de nom valide et pas une entité connue, c'est bon
+      return validNameFormat && !isKnownEntity && validLength;
+    }
     
     return validNameFormat && !isKnownEntity && validLength;
   }
   
   /**
    * Vérifie si un texte contient des mots qui ne sont pas des noms de personnes
+   * @param {boolean} lessStrict - Si true, applique des règles moins strictes
    */
-  _containsNonPersonWords(text) {
+  _containsNonPersonWords(text, lessStrict = false) {
     if (!text) return true;
     const lowerText = text.toLowerCase();
+    
+    // MOINS STRICT: Vérifier uniquement les correspondances exactes
+    if (lessStrict) {
+      return NON_PERSON_WORDS.some(word => 
+        lowerText === word.toLowerCase());
+    }
     
     return NON_PERSON_WORDS.some(word => 
       lowerText === word.toLowerCase() || 
@@ -391,9 +489,9 @@ class ContactService {
     const nameIndex = text.indexOf(name);
     if (nameIndex === -1) return null;
     
-    // Récupérer un contexte de 100 caractères autour du nom
-    const contextStart = Math.max(0, nameIndex - 50);
-    const contextEnd = Math.min(text.length, nameIndex + name.length + 50);
+    // Récupérer un contexte de 150 caractères autour du nom (ÉLARGI de 100 à 150)
+    const contextStart = Math.max(0, nameIndex - 75);
+    const contextEnd = Math.min(text.length, nameIndex + name.length + 75);
     
     return text.substring(contextStart, contextEnd);
   }
@@ -458,8 +556,20 @@ class ContactService {
   
   /**
    * Filtre les faux positifs dans les contacts détectés
+   * @param {boolean} lessStrict - Si true, applique des règles moins strictes
    */
-  _filterFalsePositives(contacts) {
+  _filterFalsePositives(contacts, lessStrict = true) {
+    if (lessStrict) {
+      // En mode moins strict, on garde pratiquement tous les contacts
+      return contacts.filter(contact => {
+        // Vérifier seulement que le nom a au moins deux mots
+        const nameWords = contact.name.trim().split(/\s+/);
+        return nameWords.length >= 2 && 
+               !KNOWN_ENTITIES.includes(contact.name);
+      });
+    }
+    
+    // En mode strict normal
     return contacts.filter(contact => {
       // Vérifier le nom
       if (!this._isValidPersonName(contact.name)) {
@@ -488,15 +598,19 @@ class ContactService {
    */
   extractContactsFromNews(news, company = "Schneider Electric") {
     const allContacts = [];
+    console.log(`Analyse de ${news.length} actualités...`);
 
-    news.forEach((newsItem) => {
+    news.forEach((newsItem, index) => {
       // Traiter séparément le titre et la description pour une meilleure extraction
       const title = newsItem.title || newsItem.news || "";
       const description = newsItem.description || newsItem.newsDescription || "";
       
+      console.log(`Analyse de l'actualité #${index + 1}: ${title.substring(0, 50)}...`);
+      
       // Extraire du titre (prioritaire)
       if (title) {
         const titleContacts = this.extractContacts(title, company);
+        console.log(`  - Contacts extraits du titre: ${titleContacts.length}`);
         
         // Pour chaque contact trouvé dans le titre
         titleContacts.forEach(contact => {
@@ -513,6 +627,7 @@ class ContactService {
       // Extraire du contenu combiné pour attraper d'autres contacts ou contextes
       const combinedText = `${title}. ${description}`;
       const combinedContacts = this.extractContacts(combinedText, company);
+      console.log(`  - Contacts extraits du contenu combiné: ${combinedContacts.length}`);
       
       // Combiner les contacts du contenu avec ceux du titre
       combinedContacts.forEach(contact => {
@@ -535,7 +650,9 @@ class ContactService {
     });
 
     // Dédupliquer et standardiser les contacts
-    return this._deduplicateAndStandardizeContacts(allContacts);
+    const uniqueContacts = this._deduplicateAndStandardizeContacts(allContacts);
+    console.log(`Total des contacts uniques extraits: ${uniqueContacts.length}`);
+    return uniqueContacts;
   }
 
   /**
@@ -555,6 +672,11 @@ class ContactService {
         if (contact.role !== "Poste non spécifié" && 
             (existing.role === "Poste non spécifié" || contact.confidenceScore > existing.confidenceScore)) {
           existing.role = contact.role;
+        }
+        
+        // Conserver l'email si présent
+        if (contact.email && !existing.email) {
+          existing.email = contact.email;
         }
         
         // Mettre à jour le score de confiance
