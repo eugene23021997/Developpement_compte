@@ -5,7 +5,8 @@ import { WarningIcon } from "./Icons";
 
 /**
  * Composant pour afficher l'onglet Actualités contenant les actualités et leur pertinence
- * Modifié pour gérer le dépliement synchronisé des cartes en ligne
+ * Modifié pour utiliser le système de fenêtre modale au lieu des dépliants synchronisés
+ * 
  * @param {Object} props - Les propriétés du composant
  * @param {Object} props.groupedByNews - Actualités groupées par titre
  * @param {Array} props.offersWithNewsButNoOpp - Offres mentionnées sans opportunités
@@ -17,6 +18,9 @@ import { WarningIcon } from "./Icons";
  * @param {function} props.setSelectedOffer - Fonction pour définir l'offre sélectionnée
  * @param {number} props.relevanceFilter - Filtre de pertinence
  * @param {function} props.setRelevanceFilter - Fonction pour définir le filtre de pertinence
+ * @param {boolean} props.showRssOnly - Afficher seulement les actualités RSS
+ * @param {function} props.setShowRssOnly - Fonction pour définir l'affichage RSS uniquement
+ * @param {Array} props.contacts - Liste des contacts disponibles pour les opportunités
  * @returns {JSX.Element} Contenu de l'onglet Actualités
  */
 const MatrixTabContent = ({
@@ -29,11 +33,11 @@ const MatrixTabContent = ({
   selectedOffer = "all",
   setSelectedOffer = () => {},
   relevanceFilter = 0,
-  setRelevanceFilter = () => {}
+  setRelevanceFilter = () => {},
+  showRssOnly = false,
+  setShowRssOnly = () => {},
+  contacts = []
 }) => {
-  // État pour suivre l'élément actuellement développé
-  const [expandedRowIndex, setExpandedRowIndex] = useState(null);
-  
   // État pour le filtre des opportunités de prospection
   const [showOnlyHighPotential, setShowOnlyHighPotential] = useState(false);
 
@@ -57,84 +61,11 @@ const MatrixTabContent = ({
     
     // Puis trier par date (des plus récentes aux plus anciennes)
     return filtered.sort((a, b) => {
-      const dateA = a.dateObj || parseCustomDate(a.newsDate);
-      const dateB = b.dateObj || parseCustomDate(b.newsDate);
+      const dateA = a.dateObj || new Date(a.newsDate);
+      const dateB = b.dateObj || new Date(b.newsDate);
       return dateB - dateA; // Ordre chronologique inversé
     });
   }, [newsArray, showOnlyHighPotential]);
-
-  /**
-   * Fonction utilitaire pour parser une date au format "DD Mmm. YYYY"
-   * @param {string} dateString - La date au format "DD Mmm. YYYY"
-   * @returns {Date} Objet Date correspondant
-   */
-  const parseCustomDate = (dateString) => {
-    // Mapping des mois abrégés en français vers leurs indices (0-11)
-    const monthMap = {
-      "Janv.": 0,
-      "Févr.": 1,
-      Mars: 2,
-      "Avr.": 3,
-      Mai: 4,
-      Juin: 5,
-      "Juil.": 6,
-      Août: 7,
-      "Sept.": 8,
-      "Oct.": 9,
-      "Nov.": 10,
-      "Déc.": 11,
-    };
-
-    // Découper la chaîne en composants
-    const parts = dateString.split(" ");
-    if (parts.length !== 3) {
-      console.error(`Format de date non reconnu: ${dateString}`);
-      return new Date(0); // Date par défaut en cas d'erreur
-    }
-
-    const day = parseInt(parts[0], 10);
-    const month = monthMap[parts[1]];
-    const year = parseInt(parts[2], 10);
-
-    if (isNaN(day) || month === undefined || isNaN(year)) {
-      console.error(`Impossible de parser la date: ${dateString}`);
-      return new Date(0); // Date par défaut en cas d'erreur
-    }
-
-    return new Date(year, month, day);
-  };
-
-  /**
-   * Fonction pour gérer le clic sur une ligne (gestion de l'expansion)
-   * @param {number} rowIndex - L'index de la ligne
-   */
-  const handleRowToggle = (rowIndex) => {
-    // Si la ligne est déjà développée, la replier, sinon la développer
-    setExpandedRowIndex(expandedRowIndex === rowIndex ? null : rowIndex);
-  };
-
-  /**
-   * Récupère l'indice de la ligne pour une actualité
-   * @param {number} index - L'index de l'actualité
-   * @returns {number} L'indice de la ligne
-   */
-  const getRowIndex = (index) => {
-    // Déterminer la taille de la grille en fonction de la largeur de l'écran
-    const gridColumns = window.innerWidth >= 1280 ? 3 : 
-                      window.innerWidth >= 768 ? 2 : 1;
-    
-    // Calculer l'indice de la ligne
-    return Math.floor(index / gridColumns);
-  };
-
-  /**
-   * Vérifie si une actualité doit être développée
-   * @param {number} index - L'index de l'actualité
-   * @returns {boolean} True si l'actualité doit être développée
-   */
-  const isNewsExpanded = (index) => {
-    return expandedRowIndex === getRowIndex(index);
-  };
 
   return (
     <>
@@ -337,9 +268,8 @@ const MatrixTabContent = ({
           filteredAndSortedNews.map((news, index) => (
             <NewsCard 
               key={index} 
-              news={news} 
-              expanded={isNewsExpanded(index)}
-              onToggle={() => handleRowToggle(getRowIndex(index))}
+              news={news}
+              contacts={contacts}
             />
           ))
         ) : (
@@ -414,7 +344,7 @@ const MatrixTabContent = ({
         </div>
       )}
 
-      {/* Style pour la gestion des lignes */}
+      {/* Style pour la grille d'actualités responsive */}
       <style jsx>{`
         @media (min-width: 768px) and (max-width: 1279px) {
           .premium-news-grid {
@@ -431,6 +361,7 @@ const MatrixTabContent = ({
         .premium-news-grid {
           display: grid;
           gap: 24px;
+          margin-bottom: 32px;
         }
       `}</style>
     </>
