@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { ExternalLinkIcon } from "./Icons";
+import { prospectionService } from "../services/prospectionService"; // Importer le service
 
 /**
  * Composant pour afficher une carte d'actualité avec argumentaires de pertinence
- * Amélioré avec un comportement de dépliement synchronisé sur une ligne
+ * Amélioré avec un comportement de dépliement synchronisé sur une ligne et sélection d'opportunités
  * @param {Object} props - Les propriétés du composant
  * @param {Object} props.news - L'actualité à afficher
  * @param {boolean} props.expanded - État d'expansion de la ligne (contrôlé par le parent)
@@ -22,6 +23,8 @@ const NewsCard = ({ news, expanded = false, onToggle }) => {
 
   // État pour la sélection d'offre
   const [selectedOfferIndex, setSelectedOfferIndex] = useState(null);
+  // État pour les offres sélectionnées comme opportunités de prospection
+  const [selectedOpportunities, setSelectedOpportunities] = useState([]);
 
   // Réinitialiser l'offre sélectionnée quand la carte se replie
   useEffect(() => {
@@ -29,6 +32,36 @@ const NewsCard = ({ news, expanded = false, onToggle }) => {
       setSelectedOfferIndex(null);
     }
   }, [expanded]);
+  
+  // Récupérer les opportunités sélectionnées et vérifier si nos offres sont dedans
+  useEffect(() => {
+    const checkSelectedOpportunities = () => {
+      if (!offers) return;
+      
+      const currentlySelected = prospectionService.getSelectedOpportunities();
+      
+      const selectedOffers = offers.filter(offer => 
+        currentlySelected.some(
+          opp => opp.category === offer.category && opp.detail === offer.detail
+        )
+      );
+      
+      setSelectedOpportunities(selectedOffers.map(offer => ({
+        category: offer.category,
+        detail: offer.detail
+      })));
+    };
+    
+    // Vérifier les opportunités déjà sélectionnées
+    checkSelectedOpportunities();
+    
+    // S'abonner aux changements futurs
+    const unsubscribe = prospectionService.subscribe(() => {
+      checkSelectedOpportunities();
+    });
+    
+    return () => unsubscribe();
+  }, [offers]);
 
   // Fonction pour déterminer si une offre a un fort potentiel commercial
   const isHighPotentialOffer = (offer) => {
@@ -50,6 +83,38 @@ const NewsCard = ({ news, expanded = false, onToggle }) => {
   const handleOfferClick = (index, event) => {
     event.stopPropagation(); // Empêcher la propagation du clic à la carte
     setSelectedOfferIndex(selectedOfferIndex === index ? null : index);
+  };
+  
+  // Fonction pour sélectionner/désélectionner une opportunité
+  const toggleOpportunitySelection = (offer, event) => {
+    event.stopPropagation(); // Empêcher la propagation du clic
+    
+    const opportunity = {
+      category: offer.category,
+      detail: offer.detail,
+      news: title,
+      newsDate: newsDate,
+      newsDescription: newsDescription,
+      newsLink: newsLink,
+      relevanceScore: offer.relevanceScore
+    };
+    
+    // Vérifier si l'opportunité est déjà sélectionnée
+    const isSelected = prospectionService.isOpportunitySelected(opportunity);
+    
+    // Basculer la sélection dans le service
+    if (isSelected) {
+      prospectionService.deselectOpportunity(opportunity);
+    } else {
+      prospectionService.selectOpportunity(opportunity);
+    }
+  };
+  
+  // Vérifier si une offre est sélectionnée comme opportunité
+  const isOpportunitySelected = (offer) => {
+    return selectedOpportunities.some(
+      opp => opp.category === offer.category && opp.detail === offer.detail
+    );
   };
 
   // Extraire et limiter les mots-clés à 3 maximum
@@ -367,6 +432,7 @@ const NewsCard = ({ news, expanded = false, onToggle }) => {
                 {highPotentialOffers.map((offer, index) => {
                   const offerIndex = offers.indexOf(offer);
                   const isSelected = selectedOfferIndex === offerIndex;
+                  const isOpportunityActive = isOpportunitySelected(offer);
 
                   return (
                     <div
@@ -429,6 +495,66 @@ const NewsCard = ({ news, expanded = false, onToggle }) => {
                           />
                         </svg>
                         Aucun projet en cours - Potentiel business inexploité
+                      </div>
+
+                      {/* Bouton de sélection de l'opportunité */}
+                      <div
+                        className={`opportunity-selection-button ${isOpportunityActive ? 'active' : ''}`}
+                        onClick={(e) => toggleOpportunitySelection(offer, e)}
+                        style={{
+                          marginTop: "12px",
+                          padding: "8px 16px",
+                          backgroundColor: isOpportunityActive ? "rgba(236, 72, 153, 0.8)" : "rgba(236, 72, 153, 0.1)",
+                          color: isOpportunityActive ? "white" : "#ec4899",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "8px",
+                          fontWeight: "500",
+                          transition: "all 0.2s ease"
+                        }}
+                      >
+                        {isOpportunityActive ? (
+                          <>
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                d="M20 6L9 17L4 12"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                            Opportunité sélectionnée
+                          </>
+                        ) : (
+                          <>
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                d="M17 12L12 17L7 12M12 17V3"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                            Ajouter aux opportunités
+                          </>
+                        )}
                       </div>
 
                       {/* Argumentaire de pertinence - visible uniquement lorsque l'offre est sélectionnée */}
@@ -636,7 +762,7 @@ const NewsCard = ({ news, expanded = false, onToggle }) => {
         </div>
       )}
 
-      {/* Style pour les animations */}
+      {/* Style pour les animations et les nouveaux boutons */}
       <style jsx="true">{`
         @keyframes fadeIn {
           from {
@@ -666,10 +792,18 @@ const NewsCard = ({ news, expanded = false, onToggle }) => {
           transform: scale(1.02);
           z-index: 2;
         }
+        
+        .opportunity-selection-button:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 2px 8px rgba(236, 72, 153, 0.2);
+        }
+        
+        .opportunity-selection-button.active:hover {
+          background-color: rgba(236, 72, 153, 0.9) !important;
+        }
       `}</style>
     </div>
   );
 };
 
 export default NewsCard;
-
