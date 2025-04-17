@@ -1,16 +1,18 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import NewsCard from "./NewsCard";
 import { InfoIcon } from "./Icons";
+import { prospectionService } from "../services/prospectionService"; // Importer le service
 
 /**
  * Composant pour afficher l'onglet des lignes de service et leurs actualités associées
- * Modifié pour intégrer les animations des cartes d'actualités par ligne identiques à l'onglet Actualités
+ * Modifié pour intégrer les animations des cartes d'actualités par ligne et la sélection d'opportunités
  * @param {Object} props - Les propriétés du composant
  * @param {Object} props.data - Les données de l'application
  * @param {Object} props.combinedRelevanceMatrix - Matrice de pertinence combinée
- * @param {string} props.selectedOffer - L'offre sélectionnée
+ * @param {string} props.selectedOffer - Offre sélectionnée
  * @param {function} props.setSelectedOffer - Fonction pour définir l'offre sélectionnée
  * @param {number} props.relevanceFilter - Filtre de pertinence
+ * @param {Object} props.opportunitiesByOffering - Opportunités existantes par offre
  * @returns {JSX.Element} Contenu de l'onglet Service Lines
  */
 const ServiceLineTabContent = ({
@@ -19,6 +21,7 @@ const ServiceLineTabContent = ({
   selectedOffer,
   setSelectedOffer,
   relevanceFilter,
+  opportunitiesByOffering = {}
 }) => {
   // État pour suivre les lignes de service et offres développées
   const [expandedServiceLine, setExpandedServiceLine] = useState(null);
@@ -27,6 +30,38 @@ const ServiceLineTabContent = ({
   // NOUVEAU: Gestion des lignes d'actualités développées par contexte
   const [expandedServiceLineRows, setExpandedServiceLineRows] = useState({});
   const [expandedOfferingRows, setExpandedOfferingRows] = useState({});
+  
+  // NOUVEAU: État pour les opportunités sélectionnées
+  const [selectedOpportunities, setSelectedOpportunities] = useState([]);
+
+  // NOUVEAU: S'abonner aux changements d'opportunités sélectionnées
+  useEffect(() => {
+    // Obtenir les opportunités déjà sélectionnées
+    setSelectedOpportunities(prospectionService.getSelectedOpportunities());
+    
+    // S'abonner aux futurs changements
+    const unsubscribe = prospectionService.subscribe((opportunities) => {
+      setSelectedOpportunities(opportunities);
+    });
+    
+    // Se désabonner lors du démontage du composant
+    return () => unsubscribe();
+  }, []);
+  
+  // NOUVEAU: Vérifier si une offre a des opportunités existantes
+  const checkHasOpportunities = (offerDetail, opportunitiesByOffering) => {
+    const offerDetails = offerDetail.split(", ");
+    
+    return offerDetails.some(detail => {
+      const matchingOffering = Object.keys(opportunitiesByOffering).find(
+        key => key.includes(detail) || detail.includes(key)
+      );
+      
+      return matchingOffering && 
+             opportunitiesByOffering[matchingOffering] &&
+             opportunitiesByOffering[matchingOffering].length > 0;
+    });
+  };
 
   /**
    * Fonction pour regrouper les actualités par offre
@@ -76,6 +111,8 @@ const ServiceLineTabContent = ({
                     category: item.offerCategory,
                     detail: item.offerDetail,
                     relevanceScore: item.relevanceScore,
+                    // Vérifier si l'offre a des opportunités existantes
+                    hasOpportunities: checkHasOpportunities(item.offerDetail, opportunitiesByOffering)
                   },
                 ],
               });
@@ -106,6 +143,8 @@ const ServiceLineTabContent = ({
                         category: item.offerCategory,
                         detail: item.offerDetail,
                         relevanceScore: item.relevanceScore,
+                        // Vérifier si l'offre a des opportunités existantes
+                        hasOpportunities: checkHasOpportunities(item.offerDetail, opportunitiesByOffering)
                       },
                     ],
                   });
@@ -268,6 +307,60 @@ const ServiceLineTabContent = ({
     const rowIndex = getRowIndex(index);
     const expandedRows = expandedOfferingRows[offeringKey] || [];
     return expandedRows.includes(rowIndex);
+  };
+
+  // NOUVEAU: Sélectionner une offre comme opportunité de prospection
+  const selectOfferAsOpportunity = (offering, news) => {
+    const opportunity = {
+      category: news.offers[0].category,
+      detail: offering,
+      news: news.news,
+      newsDate: news.newsDate,
+      newsDescription: news.newsDescription,
+      newsLink: news.newsLink,
+      relevanceScore: news.relevanceScore
+    };
+    
+    prospectionService.selectOpportunity(opportunity);
+  };
+  
+  // NOUVEAU: Désélectionner une offre des opportunités de prospection
+  const deselectOfferAsOpportunity = (offering, news) => {
+    const opportunity = {
+      category: news.offers[0].category,
+      detail: offering,
+      news: news.news,
+      newsDate: news.newsDate,
+      newsDescription: news.newsDescription,
+      newsLink: news.newsLink,
+      relevanceScore: news.relevanceScore
+    };
+    
+    prospectionService.deselectOpportunity(opportunity);
+  };
+  
+  // NOUVEAU: Vérifier si une offre est déjà sélectionnée comme opportunité
+  const isOfferingSelected = (offering, news) => {
+    return selectedOpportunities.some(
+      opp => opp.category === news.offers[0].category && opp.detail === offering
+    );
+  };
+  
+  // NOUVEAU: Vérifier si une offre a un potentiel de prospection (score 3 et pas d'opportunités)
+  const hasProspectionPotential = (news, offering) => {
+    if (!news || !news.offers || news.offers.length === 0) return false;
+    
+    // Vérifier si l'actualité a un score de pertinence de 3
+    const relevanceScore = news.relevanceScore || news.offers[0].relevanceScore;
+    if (relevanceScore !== 3) return false;
+    
+    // Vérifier si l'offre a des opportunités existantes
+    const hasExistingOpportunities = Object.keys(opportunitiesByOffering).some(key => {
+      const isMatchingOffering = key === offering || key.includes(offering) || offering.includes(key);
+      return isMatchingOffering && opportunitiesByOffering[key] && opportunitiesByOffering[key].length > 0;
+    });
+    
+    return !hasExistingOpportunities;
   };
 
   return (
@@ -521,6 +614,23 @@ const ServiceLineTabContent = ({
                             />
                           </svg>
                           <span>{offering}</span>
+
+                          {/* NOUVEAU: Badge d'opportunité s'il y a potentiel de prospection */}
+                          {offeringData.news.some(news => hasProspectionPotential(news, offering)) && (
+                            <span 
+                              className="opportunity-badge"
+                              style={{
+                                fontSize: "12px",
+                                fontWeight: "500",
+                                padding: "2px 8px",
+                                borderRadius: "20px",
+                                backgroundColor: "rgba(236, 72, 153, 0.1)",
+                                color: "#ec4899"
+                              }}
+                            >
+                              Opportunité
+                            </span>
+                          )}
                         </div>
 
                         {/* Badge indiquant le nombre d'actualités */}
@@ -552,27 +662,107 @@ const ServiceLineTabContent = ({
                       </div>
 
                       {/* Actualités associées à l'offre (visible si développé) */}
-                      {expandedOffer === offering &&
-                        offeringData.news.length > 0 && (
-                          <div style={{ padding: "16px" }}>
-                            <div className="premium-news-grid">
-                              {sortNewsByDate(offeringData.news).map(
-                                (news, index) => (
-                                  <NewsCard
-                                    key={`${serviceLine}-${offering}-news-${index}`}
-                                    news={news}
-                                    expanded={isOfferingNewsExpanded(serviceLine, offering, index)}
-                                    onToggle={() => handleOfferingRowToggle(
-                                      serviceLine, 
-                                      offering, 
-                                      getRowIndex(index)
-                                    )}
-                                  />
-                                )
+                      {expandedOffer === offering && (
+                        <div style={{ padding: "16px" }}>
+                          {/* NOUVEAU: Bouton de sélection d'opportunité s'il y a potentiel de prospection */}
+                          {offeringData.news.some(news => hasProspectionPotential(news, offering)) && (
+                            <div style={{ marginBottom: "16px" }}>
+                              {isOfferingSelected(offering, offeringData.news[0]) ? (
+                                <button
+                                  className="opportunity-button selected"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    deselectOfferAsOpportunity(offering, offeringData.news[0]);
+                                  }}
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    gap: "8px",
+                                    padding: "8px 16px",
+                                    fontSize: "14px",
+                                    fontWeight: "500",
+                                    backgroundColor: "rgba(236, 72, 153, 0.8)",
+                                    color: "white",
+                                    border: "none",
+                                    borderRadius: "6px",
+                                    cursor: "pointer",
+                                    transition: "all 0.2s ease"
+                                  }}
+                                >
+                                  <svg 
+                                    width="16" 
+                                    height="16" 
+                                    viewBox="0 0 24 24" 
+                                    fill="none" 
+                                    stroke="currentColor" 
+                                    strokeWidth="2" 
+                                    strokeLinecap="round" 
+                                    strokeLinejoin="round"
+                                  >
+                                    <path d="M20 6L9 17L4 12"></path>
+                                  </svg>
+                                  Opportunité sélectionnée
+                                </button>
+                              ) : (
+                                <button
+                                  className="opportunity-button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    selectOfferAsOpportunity(offering, offeringData.news[0]);
+                                  }}
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    gap: "8px",
+                                    padding: "8px 16px",
+                                    fontSize: "14px",
+                                    fontWeight: "500",
+                                    backgroundColor: "rgba(236, 72, 153, 0.1)",
+                                    color: "#ec4899",
+                                    border: "none",
+                                    borderRadius: "6px",
+                                    cursor: "pointer",
+                                    transition: "all 0.2s ease"
+                                  }}
+                                >
+                                  <svg 
+                                    width="16" 
+                                    height="16" 
+                                    viewBox="0 0 24 24" 
+                                    fill="none" 
+                                    stroke="currentColor" 
+                                    strokeWidth="2" 
+                                    strokeLinecap="round" 
+                                    strokeLinejoin="round"
+                                  >
+                                    <path d="M17 12L12 17L7 12M12 17V3"></path>
+                                  </svg>
+                                  Ajouter aux opportunités de prospection
+                                </button>
                               )}
                             </div>
+                          )}
+                          
+                          <div className="premium-news-grid">
+                            {sortNewsByDate(offeringData.news).map(
+                              (news, index) => (
+                                <NewsCard
+                                  key={`${serviceLine}-${offering}-news-${index}`}
+                                  news={news}
+                                  expanded={isOfferingNewsExpanded(serviceLine, offering, index)}
+                                  onToggle={() => handleOfferingRowToggle(
+                                    serviceLine, 
+                                    offering, 
+                                    getRowIndex(index)
+                                  )}
+                                />
+                              )
+                            )}
                           </div>
-                        )}
+                        </div>
+                      )}
 
                       {/* Message si aucune actualité (visible si développé) */}
                       {expandedOffer === offering &&
@@ -650,7 +840,7 @@ const ServiceLineTabContent = ({
         </div>
       )}
 
-      {/* Style pour la gestion des lignes */}
+      {/* Style pour la gestion des lignes et les boutons d'opportunité */}
       <style jsx>{`
         @media (min-width: 768px) and (max-width: 1279px) {
           .premium-news-grid {
@@ -667,6 +857,15 @@ const ServiceLineTabContent = ({
         .premium-news-grid {
           display: grid;
           gap: 24px;
+        }
+        
+        .opportunity-button:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 2px 8px rgba(236, 72, 153, 0.2);
+        }
+        
+        .opportunity-button.selected:hover {
+          background-color: rgba(236, 72, 153, 0.9) !important;
         }
       `}</style>
     </div>
