@@ -843,207 +843,18 @@ const App = () => {
         </div>
 
         <div className="premium-container">
-          <div className="premium-filters">
-            <div className="premium-filter-controls">
-              {/* Sélecteur de ligne de service */}
-              <div className="premium-selector">
-                <label htmlFor="serviceLineSelect">Ligne de service:</label>
-                <select
-                  id="serviceLineSelect"
-                  value={selectedOffer}
-                  onChange={(e) => setSelectedOffer(e.target.value)}
-                  className="premium-select"
+          {/* SUPPRIMÉ: La section premium-filters est retirée d'ici pour éviter la duplication */}
+
+          {/* Résultats de recherche */}
+          {searchTerm && (
+            <div className="premium-search-results">
+              <div className="premium-search-term">
+                <span>Recherche: </span>
+                <strong>{searchTerm}</strong>
+                <button
+                  className="premium-clear-search"
+                  onClick={() => setSearchTerm("")}
                 >
-                  <option value="all">Toutes les offres</option>
-                  {Object.keys(serviceLineStats).map((serviceLine) => (
-                    <option key={serviceLine} value={serviceLine}>
-                      {serviceLine}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Filtres de l'onglet Actualités */}
-              {activeTab === "actualites" && (
-                <>
-                  <div className="premium-selector">
-                    <label htmlFor="relevanceSelect">Pertinence minimum:</label>
-                    <select
-                      id="relevanceSelect"
-                      value={relevanceFilter}
-                      onChange={(e) =>
-                        setRelevanceFilter(parseInt(e.target.value))
-                      }
-                      className="premium-select"
-                    >
-                      <option value="0">Tous les scores</option>
-                      <option value="1">1 et plus</option>
-                      <option value="2">2 et plus</option>
-                      <option value="3">3 seulement</option>
-                    </select>
-                  </div>
-
-                  <div className="premium-selector">
-                    <label htmlFor="newsSourceSelect">Source:</label>
-                    <select
-                      id="newsSourceSelect"
-                      value={showRssOnly ? "rss" : "all"}
-                      onChange={(e) => setShowRssOnly(e.target.value === "rss")}
-                      className="premium-select"
-                    >
-                      <option value="all">Toutes les actualités</option>
-                      <option value="rss">Actualités RSS seulement</option>
-                    </select>
-                  </div>
-                </>
-              )}
-
-              {/* Filtre de l'onglet Service Lines */}
-              {activeTab === "servicelines" && (
-                <div className="premium-selector">
-                  <label htmlFor="relevanceSelect">Pertinence minimum:</label>
-                  <select
-                    id="relevanceSelect"
-                    value={relevanceFilter}
-                    onChange={(e) =>
-                      setRelevanceFilter(parseInt(e.target.value))
-                    }
-                    className="premium-select"
-                  >
-                    <option value="0">Tous les scores</option>
-                    <option value="1">1 et plus</option>
-                    <option value="2">2 et plus</option>
-                    <option value="3">3 seulement</option>
-                  </select>
-                </div>
-              )}
-
-              {/* Bouton de rafraîchissement des actualités RSS (sauf pour l'onglet Contacts) */}
-              {activeTab !== "contacts" && (
-                <div className="premium-selector">
-                  <label htmlFor="refreshRss">Actualités RSS:</label>
-                  <button
-                    id="refreshRss"
-                    className="premium-button"
-                    onClick={fetchRssNews}
-                    disabled={isLoadingRss}
-                  >
-                    {isLoadingRss ? (
-                      <>
-                        <LoadingSpinner size="small" />
-                        Mise à jour...
-                      </>
-                    ) : (
-                      <>
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                          style={{ marginRight: "8px" }}
-                        >
-                          <path
-                            d="M23 4V10H17"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                          <path
-                            d="M1 20V14H7"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                          <path
-                            d="M3.51 9.00001C4.01717 7.56586 4.87913 6.2899 6.01547 5.27495C7.1518 4.26 8.52547 3.54233 10.0083 3.1851C11.4911 2.82788 13.0348 2.84181 14.5091 3.22531C15.9834 3.6088 17.3421 4.34536 18.456 5.38801L23 10M1 14L5.544 18.612C6.65794 19.6547 8.01658 20.3912 9.49087 20.7747C10.9652 21.1582 12.5089 21.1721 13.9917 20.8149C15.4745 20.4577 16.8482 19.74 17.9845 18.7251C19.1209 17.7101 19.9828 16.4342 20.49 15"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                        Rafraîchir
-                      </>
-                    )}
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Résultats de recherche */}
-            {searchTerm && (
-              <div className="premium-search-results">
-                <div className="premium-search-term">
-                  <span>Recherche: </span>
-                  <strong>{searchTerm}</strong>
-                  <button
-                    className="premium-clear-search"
-                    onClick={() => setSearchTerm("")}
-                  >
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M18 6L6 18"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      <path
-                        d="M6 6L18 18"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Bannière RSS uniquement */}
-            {showRssOnly && (
-              <div className="premium-rss-banner">
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M4 11C6.38695 11 8.67613 11.9482 10.364 13.636C12.0518 15.3239 13 17.6131 13 20"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M4 4C8.24346 4 12.3131 5.68571 15.3137 8.68629C18.3143 11.6869 20 15.7565 20 20"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M5 20C5.55228 20 6 19.5523 6 19C6 18.4477 5.55228 18 5 18C4.44772 18 4 18.4477 4 19C4 19.5523 4.44772 20 5 20Z"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                <span>Affichage des actualités RSS uniquement</span>
-                <button onClick={() => setShowRssOnly(false)}>
                   <svg
                     width="16"
                     height="16"
@@ -1068,8 +879,8 @@ const App = () => {
                   </svg>
                 </button>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Contenu principal selon l'onglet actif */}
           <div className="premium-content">
@@ -1079,6 +890,14 @@ const App = () => {
                 offersWithNewsButNoOpp={offersWithNewsButNoOpp}
                 offeringToServiceLine={offeringToServiceLine}
                 isLoadingRss={isLoadingRss}
+                fetchRssNews={fetchRssNews}
+                serviceLineStats={serviceLineStats}
+                selectedOffer={selectedOffer}
+                setSelectedOffer={setSelectedOffer}
+                relevanceFilter={relevanceFilter}
+                setRelevanceFilter={setRelevanceFilter}
+                showRssOnly={showRssOnly}
+                setShowRssOnly={setShowRssOnly}
               />
             )}
 
@@ -1125,4 +944,3 @@ const App = () => {
 };
 
 export default App;
-
