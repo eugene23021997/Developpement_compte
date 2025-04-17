@@ -684,4 +684,3 @@ export const rssFeedService = {
   getAllNews,
   analyzeNewsRelevance,
 };
-
