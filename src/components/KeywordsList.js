@@ -4,11 +4,11 @@ import React from "react";
  * Composant pour afficher une liste de mots-clés sous forme de badges/pills
  * @param {Object} props - Les propriétés du composant
  * @param {Array|string} props.keywords - Liste de mots-clés ou chaîne séparée par des virgules
- * @param {number} [props.maxDisplay=8] - Nombre maximum de mots-clés à afficher
+ * @param {number} [props.maxDisplay=5] - Nombre maximum de mots-clés à afficher
  * @param {boolean} [props.withDots=false] - Utiliser des points comme séparateurs
  * @returns {JSX.Element|null} Liste de mots-clés ou null si aucun mot-clé
  */
-const KeywordsList = ({ keywords, maxDisplay = 8, withDots = false }) => {
+const KeywordsList = ({ keywords, maxDisplay = 5, withDots = false }) => {
   // Si aucun mot-clé n'est fourni ou si c'est une chaîne vide
   if (!keywords || (Array.isArray(keywords) && keywords.length === 0)) {
     return null;
@@ -43,4 +43,3 @@ const KeywordsList = ({ keywords, maxDisplay = 8, withDots = false }) => {
 };
 
 export default KeywordsList;
-
