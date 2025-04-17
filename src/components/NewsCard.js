@@ -672,3 +672,4 @@ const NewsCard = ({ news, expanded = false, onToggle }) => {
 };
 
 export default NewsCard;
+
