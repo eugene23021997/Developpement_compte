@@ -18,3 +18,4 @@ export const ExternalLinkIcon = ({ className }) => (
     <path d="M10 14L21 3" />
   </svg>
 );
+
