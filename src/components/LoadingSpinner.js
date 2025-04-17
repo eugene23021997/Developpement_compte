@@ -58,3 +58,4 @@ const LoadingSpinner = ({ size = "medium", color = "primary" }) => {
 };
 
 export default LoadingSpinner;
+
