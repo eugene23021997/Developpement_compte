@@ -43,6 +43,9 @@ const App = () => {
   const [yearlyStats, setYearlyStats] = useState({});
   const [offeringToServiceLine, setOfferingToServiceLine] = useState({});
   const [offersWithNewsButNoOpp, setOffersWithNewsButNoOpp] = useState([]);
+  
+  // État pour les contacts
+  const [contacts, setContacts] = useState([]);
 
   // Récupération des données principales
   const data = useMemo(() => dataService.getData(), []);
@@ -289,6 +292,13 @@ const App = () => {
 
       // Mettre à jour la date de dernière mise à jour
       setLastRssUpdate(new Date());
+      
+      // Extraire les contacts des actualités si disponible
+      if (data.schneiderNews) {
+        const extractedContacts = [];
+        // Logique d'extraction des contacts...
+        setContacts(extractedContacts);
+      }
     } catch (error) {
       console.error(
         "Erreur lors de la récupération des actualités RSS:",
@@ -898,6 +908,7 @@ const App = () => {
                 setRelevanceFilter={setRelevanceFilter}
                 showRssOnly={showRssOnly}
                 setShowRssOnly={setShowRssOnly}
+                contacts={contacts} // Ajout des contacts
               />
             )}
 
@@ -908,6 +919,8 @@ const App = () => {
                 selectedOffer={selectedOffer}
                 setSelectedOffer={setSelectedOffer}
                 relevanceFilter={relevanceFilter}
+                opportunitiesByOffering={opportunitiesByOffering}
+                contacts={contacts} // Ajout des contacts
               />
             )}
 
@@ -944,4 +957,3 @@ const App = () => {
 };
 
 export default App;
-
