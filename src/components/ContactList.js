@@ -506,4 +506,3 @@ const ContactList = ({ contacts, isLoadingRss, isImportedList = false }) => {
 };
 
 export default ContactList;
-
