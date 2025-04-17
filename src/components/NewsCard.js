@@ -1,13 +1,16 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ExternalLinkIcon } from "./Icons";
 
 /**
  * Composant pour afficher une carte d'actualité avec argumentaires de pertinence
+ * Amélioré avec un comportement de dépliement synchronisé sur une ligne
  * @param {Object} props - Les propriétés du composant
  * @param {Object} props.news - L'actualité à afficher
+ * @param {boolean} props.expanded - État d'expansion de la ligne (contrôlé par le parent)
+ * @param {function} props.onToggle - Fonction appelée lors du clic pour l'expansion
  * @returns {JSX.Element} Carte d'actualité
  */
-const NewsCard = ({ news }) => {
+const NewsCard = ({ news, expanded = false, onToggle }) => {
   const {
     news: title,
     newsDate,
@@ -17,10 +20,15 @@ const NewsCard = ({ news }) => {
     offers,
   } = news;
 
-  // États pour l'expansion de la carte et la sélection d'offre
-  const [expanded, setExpanded] = useState(false);
+  // État pour la sélection d'offre
   const [selectedOfferIndex, setSelectedOfferIndex] = useState(null);
-  const [showLegend, setShowLegend] = useState(false);
+
+  // Réinitialiser l'offre sélectionnée quand la carte se replie
+  useEffect(() => {
+    if (!expanded) {
+      setSelectedOfferIndex(null);
+    }
+  }, [expanded]);
 
   // Fonction pour déterminer si une offre a un fort potentiel commercial
   const isHighPotentialOffer = (offer) => {
@@ -31,12 +39,10 @@ const NewsCard = ({ news }) => {
   const highPotentialOffers = offers ? offers.filter(isHighPotentialOffer) : [];
   const hasHighPotential = highPotentialOffers.length > 0;
 
-  // Fonction pour basculer l'expansion de la carte
-  const toggleExpanded = () => {
-    setExpanded(!expanded);
-    // Réinitialiser l'offre sélectionnée lors de la fermeture
-    if (expanded) {
-      setSelectedOfferIndex(null);
+  // Fonction pour gérer le clic sur la carte (propager au parent)
+  const handleCardClick = () => {
+    if (onToggle) {
+      onToggle();
     }
   };
 
@@ -46,57 +52,20 @@ const NewsCard = ({ news }) => {
     setSelectedOfferIndex(selectedOfferIndex === index ? null : index);
   };
 
-  // Extraction des mots-clés à partir de la catégorie
-  const extractKeywords = (categoryString) => {
+  // Extraire et limiter les mots-clés à 3 maximum
+  const getKeywords = (categoryString) => {
     if (!categoryString) return [];
-    // Diviser la chaîne par virgules et nettoyer les espaces
-    return categoryString.split(",").map((k) => k.trim());
-  };
-
-  // Assigner une classe CSS aux mots-clés selon leur contenu
-  const getCategoryClass = (keyword) => {
-    const lowerKeyword = keyword.toLowerCase();
-    if (lowerKeyword.includes('ia') || lowerKeyword.includes('intelligence artificielle') || 
-        lowerKeyword.includes('ai') || lowerKeyword.includes('machine learning')) {
-      return 'ai';
-    }
-    if (lowerKeyword.includes('data') || lowerKeyword.includes('données') || 
-        lowerKeyword.includes('analytics')) {
-      return 'data';
-    }
-    if (lowerKeyword.includes('cyber') || lowerKeyword.includes('sécurité') || 
-        lowerKeyword.includes('security')) {
-      return 'security';
-    }
-    if (lowerKeyword.includes('finance') || lowerKeyword.includes('financial') || 
-        lowerKeyword.includes('risk')) {
-      return 'finance';
-    }
-    if (lowerKeyword.includes('tech') || lowerKeyword.includes('digital') || 
-        lowerKeyword.includes('cloud')) {
-      return 'tech';
-    }
-    if (lowerKeyword.includes('invest') || lowerKeyword.includes('acquisition') || 
-        lowerKeyword.includes('fusion')) {
-      return 'investment';
-    }
-    if (lowerKeyword.includes('rh') || lowerKeyword.includes('ressources') || 
-        lowerKeyword.includes('social')) {
-      return 'hr';
-    }
-    if (lowerKeyword.includes('développement') || lowerKeyword.includes('durable') || 
-        lowerKeyword.includes('green') || lowerKeyword.includes('économie circulaire')) {
-      return 'sustainability';
-    }
-    // Pour tous les autres mots-clés, attribuer une classe par défaut
-    return 'default';
+    // Diviser la chaîne par virgules, nettoyer les espaces et limiter à 3
+    return categoryString
+      .split(",")
+      .map((k) => k.trim())
+      .filter((k) => k.length > 0)
+      .slice(0, 3);
   };
 
   // Générer un argumentaire de pertinence court et précis
   const generateRelevanceArgument = (offer) => {
     // Les argumentaires spécifiques selon le contenu de l'actualité
-
-    // Pour l'actualité sur la fuite de données de Schneider Electric
     if (
       title.includes("fuite de données") ||
       title.includes("cybersécurité") ||
@@ -156,35 +125,18 @@ const NewsCard = ({ news }) => {
     }
   };
 
-  // Données pour la légende des mots-clés
-  const keywordLegend = [
-    { class: 'ai', label: 'IA & Machine Learning' },
-    { class: 'data', label: 'Données & Analytics' },
-    { class: 'security', label: 'Cybersécurité' },
-    { class: 'finance', label: 'Finance & Risque' },
-    { class: 'tech', label: 'Technologie & Digital' },
-    { class: 'investment', label: 'Investissement & M&A' },
-    { class: 'hr', label: 'Ressources Humaines' },
-    { class: 'sustainability', label: 'Développement Durable' },
-    { class: 'default', label: 'Autres thématiques' }
-  ];
-
-  // Afficher la légende
-  const toggleLegend = (e) => {
-    e.stopPropagation();
-    setShowLegend(!showLegend);
-  };
-
   return (
     <div
       className={`premium-news-card ${
         hasHighPotential ? "high-potential" : ""
-      }`}
-      onClick={toggleExpanded}
+      } ${expanded ? "expanded-card" : ""}`}
+      onClick={handleCardClick}
       style={{
         cursor: "pointer",
         borderLeft: hasHighPotential ? "4px solid #ec4899" : "none",
-        transition: "all 0.2s ease",
+        transition: "all 0.3s ease",
+        position: "relative",
+        overflow: "hidden",
       }}
     >
       <div className="premium-news-card-content">
@@ -198,54 +150,20 @@ const NewsCard = ({ news }) => {
           }}
         >
           <span className="premium-news-date">{newsDate}</span>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            {/* Bouton pour afficher la légende */}
-            <button 
-              className="premium-legend-toggle" 
-              onClick={toggleLegend}
-              title="Afficher/masquer la légende des codes couleur"
+
+          {/* Indicateur visuel discret d'opportunité de prospection */}
+          {hasHighPotential && (
+            <div
               style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "4px",
-                borderRadius: "4px",
-                color: "var(--text-tertiary)",
+                width: "10px",
+                height: "10px",
+                borderRadius: "50%",
+                backgroundColor: "#ec4899",
+                boxShadow: "0 0 5px rgba(236, 72, 153, 0.5)",
               }}
-            >
-              <svg 
-                width="16" 
-                height="16" 
-                viewBox="0 0 24 24" 
-                fill="none"
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round"
-              >
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="16" x2="12" y2="12"></line>
-                <line x1="12" y1="8" x2="12.01" y2="8"></line>
-              </svg>
-            </button>
-            
-            {/* Indicateur visuel discret d'opportunité de prospection */}
-            {hasHighPotential && (
-              <div
-                style={{
-                  width: "10px",
-                  height: "10px",
-                  borderRadius: "50%",
-                  backgroundColor: "#ec4899",
-                  boxShadow: "0 0 5px rgba(236, 72, 153, 0.5)",
-                }}
-                title="Opportunité de prospection"
-              ></div>
-            )}
-          </div>
+              title="Opportunité de prospection"
+            ></div>
+          )}
         </div>
 
         {/* Titre de l'actualité */}
@@ -266,56 +184,19 @@ const NewsCard = ({ news }) => {
           )}
         </h3>
 
-        {/* Légende des mots-clés (conditionnelle) */}
-        {showLegend && (
-          <div 
-            className="premium-keywords-legend"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              marginTop: "12px",
-              padding: "10px",
-              backgroundColor: "rgba(255, 255, 255, 0.8)",
-              borderRadius: "8px",
-              border: "1px solid rgba(0, 0, 0, 0.05)",
-              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)",
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
-              gap: "8px",
-              fontSize: "12px",
-            }}
-          >
-            {keywordLegend.map((item, idx) => (
-              <div 
-                key={idx} 
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                }}
-              >
-                <span 
-                  className={`premium-keyword-badge ${item.class}`}
-                  style={{
-                    width: "12px",
-                    height: "12px",
-                    padding: 0,
-                    minWidth: "12px",
-                  }}
-                ></span>
-                <span>{item.label}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Affichage des mots-clés avec les badges colorés */}
+        {/* Affichage des mots-clés simplifiés - limités à 3 */}
         {newsCategory && (
           <div style={{ marginTop: "12px" }}>
             <div className="premium-keywords-container">
-              {extractKeywords(newsCategory).map((keyword, idx) => (
-                <span 
-                  key={idx} 
-                  className={`premium-keyword-badge ${getCategoryClass(keyword)}`}
+              {getKeywords(newsCategory).map((keyword, idx) => (
+                <span
+                  key={idx}
+                  className="premium-keyword-badge"
+                  style={{
+                    backgroundColor: "rgba(0, 0, 0, 0.05)",
+                    color: "var(--text-secondary)",
+                    border: "1px solid rgba(0, 0, 0, 0.08)",
+                  }}
                 >
                   {keyword}
                 </span>
@@ -412,66 +293,77 @@ const NewsCard = ({ news }) => {
             </svg>
           )}
         </div>
+      </div>
 
-        {/* Contenu détaillé (visible uniquement en mode expanded) */}
-        {expanded && offers && offers.length > 0 && (
-          <div
-            className="premium-offers-section"
-            style={{
-              marginTop: "16px",
-              padding: "16px",
-              backgroundColor: "rgba(0, 0, 0, 0.02)",
-              borderRadius: "8px",
-            }}
-          >
-            <h4 className="premium-section-title">
-              Offres associées à cette actualité
-            </h4>
+      {/* Contenu détaillé en pleine largeur - visible uniquement quand la ligne est expandée */}
+      {expanded && offers && offers.length > 0 && (
+        <div
+          className="premium-offers-fullwidth"
+          style={{
+            width: "100%",
+            marginTop: "0",
+            padding: "24px",
+            backgroundColor: "rgba(0, 0, 0, 0.02)",
+            borderTop: "1px solid var(--divider)",
+            animation: "slideDown 0.3s ease-out",
+          }}
+        >
+          <h4 className="premium-section-title">
+            Offres associées à cette actualité
+          </h4>
 
-            {/* Afficher d'abord les offres à fort potentiel */}
-            {highPotentialOffers.length > 0 && (
-              <div
+          {/* Afficher d'abord les offres à fort potentiel */}
+          {highPotentialOffers.length > 0 && (
+            <div
+              style={{
+                marginBottom: "16px",
+                marginTop: "12px",
+              }}
+            >
+              <h5
                 style={{
-                  marginBottom: "16px",
-                  marginTop: "12px",
+                  fontSize: "14px",
+                  fontWeight: "500",
+                  marginBottom: "12px",
+                  color: "#ec4899",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
                 }}
               >
-                <h5
-                  style={{
-                    fontSize: "14px",
-                    fontWeight: "500",
-                    marginBottom: "8px",
-                    color: "#ec4899",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                  }}
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
                 >
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M12 16L16 11H13V8L9 13H12V16Z"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  Offres à fort potentiel de prospection
-                </h5>
+                  <path
+                    d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M12 16L16 11H13V8L9 13H12V16Z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                Offres à fort potentiel de prospection
+              </h5>
 
+              <div
+                className="high-potential-offers-grid"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+                  gap: "16px",
+                }}
+              >
                 {highPotentialOffers.map((offer, index) => {
                   const offerIndex = offers.indexOf(offer);
                   const isSelected = selectedOfferIndex === offerIndex;
@@ -481,15 +373,17 @@ const NewsCard = ({ news }) => {
                       key={`high-potential-${index}`}
                       onClick={(e) => handleOfferClick(offerIndex, e)}
                       style={{
-                        padding: "12px",
-                        marginBottom: "8px",
+                        padding: "16px",
                         backgroundColor: "white",
                         borderRadius: "8px",
                         borderLeft: "3px solid #ec4899",
                         boxShadow: "0 2px 10px rgba(0, 0, 0, 0.05)",
                         cursor: "pointer",
-                        transition: "all 0.2s ease",
-                        transform: isSelected ? "translateX(4px)" : "none",
+                        transition: "all 0.3s ease",
+                        transform: isSelected ? "translateY(-4px)" : "none",
+                        boxShadow: isSelected
+                          ? "0 8px 20px rgba(0, 0, 0, 0.08)"
+                          : "0 2px 10px rgba(0, 0, 0, 0.05)",
                       }}
                     >
                       <div
@@ -598,7 +492,9 @@ const NewsCard = ({ news }) => {
                             </svg>
                             Argumentaire de pertinence
                           </div>
-                          {generateRelevanceArgument(offer)}
+                          <div style={{ whiteSpace: "pre-line" }}>
+                            {generateRelevanceArgument(offer)}
+                          </div>
                         </div>
                       )}
 
@@ -621,126 +517,127 @@ const NewsCard = ({ news }) => {
                   );
                 })}
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Afficher ensuite les autres offres dans un format plus compact */}
-            {offers.filter((offer) => !isHighPotentialOffer(offer)).length >
-              0 && (
-              <>
-                <h5
-                  style={{
-                    fontSize: "14px",
-                    fontWeight: "500",
-                    marginBottom: "8px",
-                    marginTop: "16px",
-                    color: "var(--text-secondary)",
-                  }}
-                >
-                  Autres offres associées
-                </h5>
+          {/* Afficher ensuite les autres offres dans un format plus compact */}
+          {offers.filter((offer) => !isHighPotentialOffer(offer)).length >
+            0 && (
+            <>
+              <h5
+                style={{
+                  fontSize: "14px",
+                  fontWeight: "500",
+                  marginBottom: "12px",
+                  marginTop: "24px",
+                  color: "var(--text-secondary)",
+                }}
+              >
+                Autres offres associées
+              </h5>
 
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns:
-                      "repeat(auto-fill, minmax(200px, 1fr))",
-                    gap: "8px",
-                    marginTop: "8px",
-                  }}
-                >
-                  {offers
-                    .filter((offer) => !isHighPotentialOffer(offer))
-                    .map((offer, index) => {
-                      const offerIndex = offers.indexOf(offer);
-                      const isSelected = selectedOfferIndex === offerIndex;
+              <div
+                className="other-offers-grid"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
+                  gap: "16px",
+                }}
+              >
+                {offers
+                  .filter((offer) => !isHighPotentialOffer(offer))
+                  .map((offer, index) => {
+                    const offerIndex = offers.indexOf(offer);
+                    const isSelected = selectedOfferIndex === offerIndex;
 
-                      return (
+                    return (
+                      <div
+                        key={index}
+                        onClick={(e) => handleOfferClick(offerIndex, e)}
+                        style={{
+                          padding: "16px",
+                          backgroundColor: "white",
+                          borderRadius: "8px",
+                          cursor: "pointer",
+                          transition: "all 0.3s ease",
+                          border: isSelected
+                            ? "1px solid rgba(59, 130, 246, 0.3)"
+                            : "1px solid transparent",
+                          boxShadow: isSelected
+                            ? "0 4px 15px rgba(59, 130, 246, 0.1)"
+                            : "0 2px 5px rgba(0, 0, 0, 0.05)",
+                          transform: isSelected ? "translateY(-4px)" : "none",
+                        }}
+                      >
                         <div
-                          key={index}
-                          onClick={(e) => handleOfferClick(offerIndex, e)}
                           style={{
-                            padding: "10px",
-                            backgroundColor: "white",
-                            borderRadius: "8px",
-                            fontSize: "13px",
-                            cursor: "pointer",
-                            border: isSelected
-                              ? "1px solid rgba(59, 130, 246, 0.3)"
-                              : "1px solid transparent",
-                            boxShadow: isSelected
-                              ? "0 2px 12px rgba(59, 130, 246, 0.1)"
-                              : "none",
-                            transition: "all 0.2s ease",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            marginBottom: "8px",
                           }}
                         >
+                          <span style={{ fontWeight: "500" }}>
+                            {offer.category}
+                          </span>
                           <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              marginBottom: "6px",
-                            }}
+                            className={`premium-relevance-badge relevance-${offer.relevanceScore}`}
                           >
-                            <span style={{ fontWeight: "500" }}>
-                              {offer.category}
-                            </span>
-                            <div
-                              className={`premium-relevance-badge relevance-${offer.relevanceScore}`}
-                              style={{ transform: "scale(0.8)" }}
-                            >
-                              {offer.relevanceScore}
-                            </div>
+                            {offer.relevanceScore}
                           </div>
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              color: "var(--text-secondary)",
-                            }}
-                          >
-                            {offer.detail}
-                          </div>
-
-                          {/* Marqueur discret indiquant qu'on peut cliquer */}
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "center",
-                              marginTop: "6px",
-                              fontSize: "11px",
-                              color: "var(--text-tertiary)",
-                              fontStyle: "italic",
-                            }}
-                          >
-                            {isSelected ? "Masquer" : "Argumentaire"}
-                          </div>
-
-                          {/* Argumentaire de pertinence - visible uniquement lorsque sélectionné */}
-                          {isSelected && (
-                            <div
-                              style={{
-                                marginTop: "8px",
-                                padding: "8px",
-                                backgroundColor: "rgba(59, 130, 246, 0.05)",
-                                borderRadius: "6px",
-                                border: "1px dashed rgba(59, 130, 246, 0.2)",
-                                fontSize: "12px",
-                                animation: "fadeIn 0.3s ease",
-                              }}
-                            >
-                              {generateRelevanceArgument(offer)}
-                            </div>
-                          )}
                         </div>
-                      );
-                    })}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-      </div>
+                        <div
+                          style={{
+                            fontSize: "13px",
+                            color: "var(--text-secondary)",
+                          }}
+                        >
+                          {offer.detail}
+                        </div>
 
-      {/* Style pour l'animation d'apparition */}
-      <style jsx>{`
+                        {/* Marqueur discret indiquant qu'on peut cliquer */}
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "center",
+                            marginTop: "10px",
+                            fontSize: "12px",
+                            color: "var(--text-tertiary)",
+                            fontStyle: "italic",
+                          }}
+                        >
+                          {isSelected
+                            ? "Masquer l'argumentaire"
+                            : "Voir l'argumentaire"}
+                        </div>
+
+                        {/* Argumentaire de pertinence - visible uniquement lorsque sélectionné */}
+                        {isSelected && (
+                          <div
+                            style={{
+                              marginTop: "10px",
+                              padding: "12px",
+                              backgroundColor: "rgba(59, 130, 246, 0.05)",
+                              borderRadius: "6px",
+                              border: "1px dashed rgba(59, 130, 246, 0.2)",
+                              fontSize: "13px",
+                              animation: "fadeIn 0.3s ease",
+                              whiteSpace: "pre-line",
+                            }}
+                          >
+                            {generateRelevanceArgument(offer)}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Style pour les animations */}
+      <style jsx="true">{`
         @keyframes fadeIn {
           from {
             opacity: 0;
@@ -750,6 +647,24 @@ const NewsCard = ({ news }) => {
             opacity: 1;
             transform: translateY(0);
           }
+        }
+
+        @keyframes slideDown {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .expanded-card {
+          margin-bottom: 16px;
+          box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+          transform: scale(1.02);
+          z-index: 2;
         }
       `}</style>
     </div>
