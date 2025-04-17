@@ -43,3 +43,4 @@ const KeywordsList = ({ keywords, maxDisplay = 5, withDots = false }) => {
 };
 
 export default KeywordsList;
+
