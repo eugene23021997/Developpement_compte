@@ -19,21 +19,6 @@ const PATTERNS = {
   // Motifs comme "Directeur X, Jean Dupont"
   TITLE_THEN_PERSON:
     /((?:directeur|directrice|président|présidente|CEO|PDG|DG|DSI|CFO|CTO|CDO|CIO|CHRO|COO|CMO|vice-président|VP|responsable|manager|chef|head|leader|dirigeant|fondateur|fondatrice|chief|officer|executive)\s+(?:[^,.])+),\s+([A-Z][a-zÀ-ÿ]+(?:\s[A-Z][a-zÀ-ÿ]+)+)/gi,
-
-  // Forme simple "Jean Dupont (Directeur...)"
-  PERSON_TITLE_PARENTHESIS:
-    /([A-Z][a-zÀ-ÿ]+(?:\s[A-Z][a-zÀ-ÿ]+)+)\s*\(([^()]*(?:directeur|directrice|président|présidente|CEO|PDG|DG|DSI|CFO|CTO|CDO|CIO|CHRO|COO|CMO|vice-président|VP|responsable|manager|chef|head|leader|dirigeant|fondateur|fondatrice|chief|officer|executive)[^()]*)\)/gi,
-
-  // Formes comme "X a nommé Jean Dupont au poste de Directeur..."
-  NAMED_AS:
-    /(?:a\s+nommé|nomme|désigne|a\s+été\s+nommé|vient\s+d[e\']être\s+nommé|a\s+promu|promeut|est\s+nommé|devient|a\s+été\s+désigné)\s+([A-Z][a-zÀ-ÿ]+(?:\s[A-Z][a-zÀ-ÿ]+)+)\s+(?:au\s+poste\s+de|comme|en\s+tant\s+que|en\s+qualité\s+de)\s+((?:[^,.]|[dD]'|[dD]e\s)+(?:directeur|directrice|président|présidente|CEO|PDG|DG|DSI|CFO|CTO|CDO|CIO|CHRO|COO|CMO|vice-président|VP|responsable|manager|chef|head|leader|dirigeant|fondateur|fondatrice|chief|officer|executive)\s+(?:[^,.])+)/gi,
-
-  // Reconnaissance directe des titres complets comme Chief Digital Officer
-  TITLE_ONLY:
-    /(Chief\s+(?:Digital|Information|Technology|Financial|Executive|Marketing|Operating|Human\s+Resources|Product|Strategy|Revenue|Customer|Security)\s+Officer|C[IDTFEMOPRSXH]O|(?:directeur|directrice)\s+(?:général|générale|technique|financier|financière|commercial|commerciale|des achats|des ventes|des opérations|marketing|des systèmes d'information))/gi,
-
-  // Liste de noms pour les personnes sans titre clairement identifié
-  POTENTIAL_NAMES: /([A-Z][a-zÀ-ÿ]+(?:\s[A-Z][a-zÀ-ÿ]+){1,2})(?![a-zÀ-ÿ])/g,
 };
 
 // Liste de titres/postes à rechercher (utilisée pour l'analyse contextuelle)
@@ -117,86 +102,12 @@ class ContactService {
     this._extractWithPattern(PATTERNS.PERSON_WITH_TITLE, cleanText, contacts, processedNames, 0.9, company);
     this._extractWithPattern(PATTERNS.PERSON_WITH_TITLE_MR_MRS, cleanText, contacts, processedNames, 0.85, company, 1);
     this._extractWithPattern(PATTERNS.TITLE_THEN_PERSON, cleanText, contacts, processedNames, 0.8, company, 2, 1);
-    this._extractWithPattern(PATTERNS.PERSON_TITLE_PARENTHESIS, cleanText, contacts, processedNames, 0.8, company);
-    this._extractWithPattern(PATTERNS.NAMED_AS, cleanText, contacts, processedNames, 0.9, company);
 
     // Extraire les titres sans nom associé
-    this._extractTitlesOnly(PATTERNS.TITLE_ONLY, cleanText, contacts, processedNames, company);
+    this._extractTitlesOnly(cleanText, contacts, processedNames, company);
 
     // Méthode 2: Recherche contextuelle pour les noms sans titre explicite
-    const potentialNames = [];
-    let match;
-    while ((match = PATTERNS.POTENTIAL_NAMES.exec(cleanText)) !== null) {
-      const name = match[1];
-
-      // Ignorer si déjà traité ou si c'est une entité connue
-      if (
-        processedNames.has(name.toLowerCase()) ||
-        KNOWN_ENTITIES.some(
-          (entity) => name.includes(entity) || entity.includes(name)
-        )
-      ) {
-        continue;
-      }
-
-      // Obtenir le contexte avant et après le nom (50 caractères)
-      const startPos = Math.max(0, match.index - 50);
-      const endPos = Math.min(cleanText.length, match.index + name.length + 50);
-      const context = cleanText.substring(startPos, endPos);
-
-      // Calculer un score de confiance basé sur le contexte
-      let confidenceScore = 0.3; // Score de base
-
-      // Indice 1: Proche de l'entreprise mentionnée
-      if (context.includes(company)) {
-        confidenceScore += 0.2;
-      }
-
-      // Indice 2: Contient des mots comme "nommé", "rejoint", etc.
-      if (
-        /nomm[ée]|rejoi[nt]|arriv[ée]|intègre|recrut[ée]|promu[e]?|désign[ée]/i.test(
-          context
-        )
-      ) {
-        confidenceScore += 0.15;
-      }
-
-      // Indice 3: Proximité d'un titre sans avoir été capturé par les regex précédentes
-      const titleNearby = TITLES.some((title) =>
-        context.toLowerCase().includes(title.toLowerCase())
-      );
-      if (titleNearby) {
-        confidenceScore += 0.15;
-
-        // Essayer d'extraire le titre à partir du contexte
-        const potentialTitle = this._extractTitleFromContext(context, name);
-
-        potentialNames.push({
-          name,
-          role: potentialTitle || "Poste non spécifié",
-          confidenceScore,
-          company,
-          context,
-        });
-      } else if (confidenceScore > 0.4) {
-        // Ajouter seulement si le score dépasse un certain seuil
-        potentialNames.push({
-          name,
-          role: "Poste non spécifié",
-          confidenceScore,
-          company,
-          context,
-        });
-      }
-
-      processedNames.add(name.toLowerCase());
-    }
-
-    // Filtrer les noms potentiels et les ajouter à la liste des contacts
-    potentialNames
-      .filter((contact) => contact.confidenceScore >= 0.4)
-      .sort((a, b) => b.confidenceScore - a.confidenceScore)
-      .forEach((contact) => contacts.push(contact));
+    this._extractContextualNames(cleanText, contacts, processedNames, company);
 
     return contacts;
   }
@@ -251,41 +162,122 @@ class ContactService {
   /**
    * Méthode privée pour extraire les titres sans nom associé
    */
-  _extractTitlesOnly(pattern, text, contacts, processedNames, company) {
-    pattern.lastIndex = 0;
+  _extractTitlesOnly(text, contacts, processedNames, company) {
+    TITLES.forEach((role) => {
+      const regex = new RegExp(`\\b${role}\\b`, "gi");
+      regex.lastIndex = 0;
+
+      let match;
+      while ((match = regex.exec(text)) !== null) {
+        const detectedRole = match[0].trim();
+
+        // Vérifier si ce titre est déjà traité
+        const roleKey = detectedRole.toLowerCase();
+        if (processedNames.has(roleKey)) {
+          continue;
+        }
+
+        // Vérifier si ce n'est pas une entité connue
+        if (
+          KNOWN_ENTITIES.some(
+            (entity) => detectedRole.includes(entity) || entity.includes(entity)
+          )
+        ) {
+          continue;
+        }
+
+        // Ajouter comme contact avec nom manquant
+        contacts.push({
+          name: "Nom non identifié",
+          role: detectedRole,
+          confidenceScore: 0.6,
+          company,
+          context: text.substring(
+            Math.max(0, match.index - 30),
+            Math.min(text.length, match.index + match[0].length + 30)
+          ),
+        });
+
+        processedNames.add(roleKey);
+      }
+    });
+  }
+
+  /**
+   * Méthode privée pour extraire les noms basés sur le contexte
+   */
+  _extractContextualNames(text, contacts, processedNames, company) {
+    // Regex pour détecter les noms propres potentiels
+    const nameRegex = /([A-Z][a-zÀ-ÿ]+(?:\s[A-Z][a-zÀ-ÿ]+){1,2})(?![a-zÀ-ÿ])/g;
+    nameRegex.lastIndex = 0;
 
     let match;
-    while ((match = pattern.exec(text)) !== null) {
-      const role = match[1].trim();
+    while ((match = nameRegex.exec(text)) !== null) {
+      const name = match[1];
 
-      // Vérifier si ce titre est déjà traité
-      const roleKey = role.toLowerCase();
-      if (processedNames.has(roleKey)) {
-        continue;
-      }
-
-      // Vérifier si ce n'est pas une entité connue
+      // Ignorer si déjà traité ou si c'est une entité connue
       if (
+        processedNames.has(name.toLowerCase()) ||
         KNOWN_ENTITIES.some(
-          (entity) => role.includes(entity) || entity.includes(entity)
+          (entity) => name.includes(entity) || entity.includes(name)
         )
       ) {
         continue;
       }
 
-      // Ajouter comme contact avec nom manquant
-      contacts.push({
-        name: "Nom non identifié",
-        role: role,
-        confidenceScore: 0.6,
-        company,
-        context: text.substring(
-          Math.max(0, match.index - 30),
-          Math.min(text.length, match.index + match[0].length + 30)
-        ),
-      });
+      // Obtenir le contexte avant et après le nom (50 caractères)
+      const startPos = Math.max(0, match.index - 50);
+      const endPos = Math.min(text.length, match.index + name.length + 50);
+      const context = text.substring(startPos, endPos);
 
-      processedNames.add(roleKey);
+      // Calculer un score de confiance basé sur le contexte
+      let confidenceScore = 0.3; // Score de base
+
+      // Indice 1: Proche de l'entreprise mentionnée
+      if (context.includes(company)) {
+        confidenceScore += 0.2;
+      }
+
+      // Indice 2: Contient des mots comme "nommé", "rejoint", etc.
+      if (
+        /nomm[ée]|rejoi[nt]|arriv[ée]|intègre|recrut[ée]|promu[e]?|désign[ée]/i.test(
+          context
+        )
+      ) {
+        confidenceScore += 0.15;
+      }
+
+      // Indice 3: Proximité d'un titre sans avoir été capturé par les regex précédentes
+      const titleNearby = TITLES.some((title) =>
+        context.toLowerCase().includes(title.toLowerCase())
+      );
+      if (titleNearby) {
+        confidenceScore += 0.15;
+
+        // Essayer d'extraire le titre à partir du contexte
+        const potentialTitle = this._extractTitleFromContext(context, name);
+
+        if (confidenceScore >= 0.4) {
+          contacts.push({
+            name,
+            role: potentialTitle || "Poste non spécifié",
+            confidenceScore,
+            company,
+            context,
+          });
+          processedNames.add(name.toLowerCase());
+        }
+      } else if (confidenceScore > 0.4) {
+        // Ajouter seulement si le score dépasse un certain seuil
+        contacts.push({
+          name,
+          role: "Poste non spécifié",
+          confidenceScore,
+          company,
+          context,
+        });
+        processedNames.add(name.toLowerCase());
+      }
     }
   }
 
@@ -424,77 +416,22 @@ class ContactService {
   }
 
   /**
-   * Importe des contacts depuis un fichier Excel
-   * @param {string} file - Le chemin du fichier à importer
-   * @param {Object} options - Options d'importation
+   * Importe des contacts depuis un fichier Excel, CSV ou autre format
+   * @param {File} file - L'objet File à importer
    * @returns {Promise<Array>} - Les contacts importés
    */
-  async importContacts(file, options = {}) {
+  async importContacts(file) {
     try {
-      const fileContent = await window.fs.readFile(file, {
-        encoding: "binary",
-      });
-
-      // Options par défaut
-      const defaultOptions = {
-        sheetName: "CRM_Contacts",
-        headerRowIndex: 0,
-        contactCompany: "Schneider Electric",
-      };
-
-      const mergedOptions = { ...defaultOptions, ...options };
-
-      // Lire le fichier Excel avec toutes les options pour capturer les métadonnées
-      const workbook = XLSX.read(fileContent, {
-        type: "binary",
-        cellDates: true,
-        cellStyles: true,
-        cellNF: true,
-        cellFormulas: true,
-        sheetStubs: true,
-      });
-
-      // Vérifier que l'onglet existe
-      if (!workbook.SheetNames.includes(mergedOptions.sheetName)) {
-        console.error(`L'onglet '${mergedOptions.sheetName}' n'existe pas dans le fichier.`);
-        console.log("Onglets disponibles:", workbook.SheetNames);
-        throw new Error(`L'onglet '${mergedOptions.sheetName}' n'existe pas dans le fichier.`);
+      console.log(`Tentative d'importation du fichier: ${file.name}`);
+      
+      // Vérifier si c'est un fichier CSV
+      if (file.name.toLowerCase().endsWith('.csv')) {
+        return this._importCSV(file);
+      } 
+      // Sinon, essayer comme un fichier Excel
+      else {
+        return this._importExcel(file);
       }
-
-      // Récupérer la feuille
-      const worksheet = workbook.Sheets[mergedOptions.sheetName];
-
-      // Analyser la structure de la feuille
-      const sheetRange = XLSX.utils.decode_range(worksheet["!ref"]);
-      console.log("Plage de la feuille:", sheetRange);
-
-      // Récupérer tous les en-têtes possibles et leurs indices
-      const headerMappings = this._analyzeHeaders(
-        worksheet,
-        mergedOptions.headerRowIndex
-      );
-
-      // Convertir la feuille en JSON
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, {
-        header: "A", // Utiliser des lettres comme en-têtes pour préserver l'ordre exact
-        range: mergedOptions.headerRowIndex, // Commencer à partir de la ligne d'en-tête
-      });
-
-      if (jsonData.length <= 1) {
-        throw new Error("Le fichier Excel ne contient pas suffisamment de données.");
-      }
-
-      // Supprimer la ligne d'en-tête
-      jsonData.shift();
-
-      // Normaliser les données en utilisant les mappages détectés
-      const contacts = this._normalizeContacts(
-        jsonData,
-        headerMappings,
-        mergedOptions.contactCompany
-      );
-
-      return contacts;
     } catch (error) {
       console.error("Erreur lors de l'importation des contacts:", error);
       throw error;
@@ -502,137 +439,346 @@ class ContactService {
   }
 
   /**
-   * Méthode privée pour analyser les en-têtes de la feuille Excel pour créer des mappings
+   * Méthode pour mieux analyser les en-têtes Excel ou CSV
+   * @param {Array} headers - Les en-têtes du fichier
+   * @returns {Object} - Mappages des en-têtes vers les indices de colonnes
    */
-  _analyzeHeaders(worksheet, headerRowIndex) {
-    const mappings = {
-      firstName: null,
-      lastName: null,
-      fullName: null,
-      email: null,
-      function: null,
-      department: null,
-      company: null,
-      phone: null,
-      mobile: null,
-      location: null,
-      country: null,
-      business: null,
-      industry: null,
+  _createHeaderMap(headers) {
+    const headerMap = {
+      name: -1,
+      firstName: -1,
+      lastName: -1,
+      role: -1,
+      company: -1,
+      email: -1,
+      department: -1,
+      phone: -1
     };
-
-    // Détecter la plage de la feuille
-    const range = XLSX.utils.decode_range(worksheet["!ref"]);
-
-    // Parcourir toutes les cellules de la ligne d'en-tête
-    for (let col = range.s.c; col <= range.e.c; col++) {
-      const cellAddress = XLSX.utils.encode_cell({ r: headerRowIndex, c: col });
-      const cell = worksheet[cellAddress];
-
-      if (!cell || !cell.v) continue;
-
-      const headerText = cell.v.toString().trim().toLowerCase();
-
-      // Mapper les en-têtes aux champs
-      if (headerText.includes("prénom") || headerText.includes("prenom") || headerText.includes("first name")) {
-        mappings.firstName = XLSX.utils.encode_col(col);
-      } else if (headerText.includes("nom") || headerText.includes("last name") || headerText === "name") {
-        mappings.lastName = XLSX.utils.encode_col(col);
-      } else if (headerText.includes("email") || headerText.includes("courriel") || headerText.includes("mail")) {
-        mappings.email = XLSX.utils.encode_col(col);
-      } else if (headerText.includes("fonction") || headerText.includes("function") || 
-                 headerText.includes("title") || headerText.includes("poste")) {
-        mappings.function = XLSX.utils.encode_col(col);
-      } else if (headerText.includes("département") || headerText.includes("departement") || 
-                 headerText.includes("department")) {
-        mappings.department = XLSX.utils.encode_col(col);
-      } else if (headerText.includes("entreprise") || headerText.includes("company") || 
-                 headerText.includes("organisation")) {
-        mappings.company = XLSX.utils.encode_col(col);
-      } else if (headerText.includes("téléphone") || headerText.includes("telephone") || 
-                (headerText.includes("phone") && !headerText.includes("mobile"))) {
-        mappings.phone = XLSX.utils.encode_col(col);
-      } else if (headerText.includes("mobile") || headerText.includes("cellulaire") || 
-                 headerText.includes("portable")) {
-        mappings.mobile = XLSX.utils.encode_col(col);
-      } else if (headerText.includes("localisation") || headerText.includes("location") || 
-                headerText.includes("bureau") || headerText.includes("office")) {
-        mappings.location = XLSX.utils.encode_col(col);
-      } else if (headerText.includes("pays") || headerText.includes("country")) {
-        mappings.country = XLSX.utils.encode_col(col);
-      } else if (headerText.includes("business") || headerText.includes("business unit") || 
-                headerText.includes("bu")) {
-        mappings.business = XLSX.utils.encode_col(col);
-      } else if (headerText.includes("industrie") || headerText.includes("industry") || 
-                headerText.includes("secteur")) {
-        mappings.industry = XLSX.utils.encode_col(col);
+    
+    // Chercher les correspondances exactes d'abord
+    headers.forEach((header, index) => {
+      const headerLower = header.toLowerCase().trim();
+      
+      // Correspondances exactes pour Role
+      if (headerLower === "role") {
+        headerMap.role = index;
       }
+      // Correspondances exactes pour les autres champs
+      else if (headerLower === "fullname" || headerLower === "full name") {
+        headerMap.name = index;
+      }
+      else if (headerLower === "firstname" || headerLower === "first name" || headerLower === "prénom" || headerLower === "prenom") {
+        headerMap.firstName = index;
+      }
+      else if (headerLower === "lastname" || headerLower === "last name" || headerLower === "nom") {
+        headerMap.lastName = index;
+      }
+      else if (headerLower === "email" || headerLower === "courriel" || headerLower === "mail") {
+        headerMap.email = index;
+      }
+      else if (headerLower === "company" || headerLower === "entreprise") {
+        headerMap.company = index;
+      }
+      else if (headerLower === "department" || headerLower === "département" || headerLower === "departement") {
+        headerMap.department = index;
+      }
+      else if (headerLower === "phone" || headerLower === "téléphone" || headerLower === "telephone") {
+        headerMap.phone = index;
+      }
+    });
+    
+    // Si on n'a pas trouvé de correspondance exacte, essayer des correspondances partielles
+    if (headerMap.role === -1) {
+      headers.forEach((header, index) => {
+        const headerLower = header.toLowerCase().trim();
+        
+        // Éviter d'utiliser des champs comme 'businessfunction'
+        // Chercher uniquement les en-têtes contenant "role" mais pas d'autres mots clés suspects
+        if (headerLower.includes("role") && 
+            !headerLower.includes("business") && 
+            !headerLower.includes("function") && 
+            !headerLower.includes("id")) {
+          headerMap.role = index;
+        }
+        
+        // Autres correspondances partielles
+        if (headerMap.name === -1 && headerLower.includes("name") && 
+            !headerLower.includes("first") && !headerLower.includes("last")) {
+          headerMap.name = index;
+        }
+        
+        // Pour les autres champs
+        if (headerMap.firstName === -1 && 
+            (headerLower.includes("first") && headerLower.includes("name") || 
+             headerLower.includes("prénom") || headerLower.includes("prenom"))) {
+          headerMap.firstName = index;
+        }
+        
+        if (headerMap.lastName === -1 && 
+            (headerLower.includes("last") && headerLower.includes("name") || 
+             headerLower.includes("nom") && !headerLower.includes("prénom"))) {
+          headerMap.lastName = index;
+        }
+        
+        if (headerMap.email === -1 && (headerLower.includes("mail") || headerLower.includes("courriel"))) {
+          headerMap.email = index;
+        }
+        
+        if (headerMap.department === -1 && 
+            (headerLower.includes("depart") || headerLower.includes("service"))) {
+          headerMap.department = index;
+        }
+        
+        if (headerMap.phone === -1 && 
+            (headerLower.includes("phone") || headerLower.includes("tel"))) {
+          headerMap.phone = index;
+        }
+      });
     }
-
-    // Si fullName n'est pas trouvé mais firstName et lastName le sont, marquer comme fullName à calculer
-    if (!mappings.fullName && (mappings.firstName || mappings.lastName)) {
-      mappings.fullName = "calculated";
-    }
-
-    return mappings;
+    
+    console.log("Mappage d'en-têtes détecté:", headerMap);
+    return headerMap;
   }
 
   /**
-   * Méthode privée pour normaliser les données de contact importées
+   * Importe des contacts depuis un fichier CSV
+   * @param {File} file - L'objet File CSV
+   * @returns {Promise<Array>} - Les contacts importés
    */
-  _normalizeContacts(data, mappings, defaultCompany) {
-    return data
-      .map((row) => {
-        // Générer le nom complet si nécessaire
-        let fullName = "";
-        if (mappings.fullName === "calculated") {
-          const firstName = mappings.firstName
-            ? row[mappings.firstName] || ""
-            : "";
-          const lastName = mappings.lastName
-            ? row[mappings.lastName] || ""
-            : "";
-          fullName = `${firstName} ${lastName}`.trim();
-        } else if (mappings.fullName) {
-          fullName = row[mappings.fullName] || "";
-        }
-
-        // Créer l'objet contact normalisé
-        return {
-          fullName,
-          role: mappings.function
-            ? row[mappings.function] || "Poste non spécifié"
-            : "Poste non spécifié",
-          company: mappings.company
-            ? row[mappings.company] || defaultCompany
-            : defaultCompany,
-          email: mappings.email ? row[mappings.email] || "" : "",
-          department: mappings.department ? row[mappings.department] || "" : "",
-          phone: mappings.phone
-            ? row[mappings.phone] || ""
-            : mappings.mobile
-            ? row[mappings.mobile] || ""
-            : "",
-          location: mappings.location ? row[mappings.location] || "" : "",
-          country: mappings.country ? row[mappings.country] || "" : "",
-          business: mappings.business ? row[mappings.business] || "" : "",
-          industry: mappings.industry ? row[mappings.industry] || "" : "",
-          confidenceScore: 1.0, // Score élevé pour les contacts importés
-          importedFromExcel: true,
-          sources: [],
+  async _importCSV(file) {
+    try {
+      // Lire le fichier CSV avec l'API FileReader
+      const fileContent = await this._readFileAsText(file);
+      
+      // Séparer les lignes
+      const lines = fileContent.split('\n');
+      if (lines.length <= 1) {
+        throw new Error("Le fichier CSV ne contient pas suffisamment de données");
+      }
+      
+      // Récupérer les en-têtes (première ligne) et nettoyer
+      const headers = lines[0].split(',').map(header => header.trim());
+      
+      // Créer un mappage des en-têtes avec la nouvelle méthode
+      const headerMap = this._createHeaderMap(headers);
+      
+      console.log("Mappage d'en-têtes CSV détecté:", headerMap);
+      
+      // Vérifier si nous avons trouvé un en-tête de rôle
+      if (headerMap.role === -1) {
+        console.warn("Attention: Aucune colonne 'Role' trouvée, certaines données pourraient être incorrectes");
+      }
+      
+      // Traiter chaque ligne
+      const contacts = [];
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        const values = line.split(',').map(value => value.trim());
+        
+        // Créer le contact
+        const contact = {
+          fullName: '',
+          role: 'Poste non spécifié',
+          company: 'Schneider Electric',
+          email: '',
+          department: '',
+          phone: '',
+          confidenceScore: 1.0,
+          sources: []
         };
-      })
-      .filter((contact) => {
-        // Filtrer les lignes vides ou invalides
-        return (
-          contact.role !== "Poste non spécifié" ||
-          contact.email ||
-          contact.department ||
-          contact.business
-        );
-      });
+        
+        // Construire le nom complet
+        if (headerMap.name >= 0 && values[headerMap.name]) {
+          contact.fullName = values[headerMap.name];
+        }
+        else if (headerMap.firstName >= 0 && headerMap.lastName >= 0) {
+          const firstName = values[headerMap.firstName] || '';
+          const lastName = values[headerMap.lastName] || '';
+          contact.fullName = `${firstName} ${lastName}`.trim();
+        }
+        
+        // Récupérer le bon rôle
+        if (headerMap.role >= 0 && values[headerMap.role]) {
+          contact.role = values[headerMap.role];
+        }
+        
+        // Remplir les autres champs
+        if (headerMap.company >= 0 && values[headerMap.company]) {
+          contact.company = values[headerMap.company];
+        }
+        if (headerMap.email >= 0 && values[headerMap.email]) {
+          contact.email = values[headerMap.email];
+        }
+        if (headerMap.department >= 0 && values[headerMap.department]) {
+          contact.department = values[headerMap.department];
+        }
+        if (headerMap.phone >= 0 && values[headerMap.phone]) {
+          contact.phone = values[headerMap.phone];
+        }
+        
+        // Ajouter seulement si nous avons un nom et que ce n'est pas une ligne vide
+        if (contact.fullName) {
+          contacts.push(contact);
+        }
+      }
+      
+      return contacts;
+      
+    } catch (error) {
+      console.error("Erreur lors de l'importation du CSV:", error);
+      throw new Error(`Erreur lors de l'importation du CSV: ${error.message}`);
+    }
   }
 
+  /**
+   * Importe des contacts depuis un fichier Excel
+   * @param {File} file - L'objet File Excel
+   * @returns {Promise<Array>} - Les contacts importés
+   */
+  async _importExcel(file) {
+    try {
+      // Lire le fichier comme ArrayBuffer
+      const arrayBuffer = await this._readFileAsArrayBuffer(file);
+      
+      // Lire le fichier Excel avec XLSX
+      const workbook = XLSX.read(arrayBuffer, {
+        type: 'array',
+        cellDates: true,
+        cellNF: true,
+        cellStyles: true
+      });
+      
+      // Vérifier que le workbook existe
+      if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) {
+        throw new Error("Format de fichier Excel non valide ou vide");
+      }
+      
+      // Trouver la première feuille qui contient "Contact" ou utiliser la première
+      let sheetName = workbook.SheetNames.find(name => 
+        name.toLowerCase().includes('contact')) || workbook.SheetNames[0];
+      
+      // Récupérer la feuille
+      const worksheet = workbook.Sheets[sheetName];
+      
+      // Convertir les en-têtes en format normal pour utiliser notre nouvelle méthode
+      const headers = [];
+      
+      // Obtenir la plage de travail
+      const range = XLSX.utils.decode_range(worksheet['!ref']);
+      
+      // Récupérer les en-têtes de la première ligne
+      for (let col = range.s.c; col <= range.e.c; col++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: range.s.r, c: col });
+        const cell = worksheet[cellAddress];
+        
+        if (cell && cell.v) {
+          headers.push(cell.v.toString());
+        } else {
+          headers.push(""); // Pour maintenir les indices alignés
+        }
+      }
+      
+      // Créer le mappage des en-têtes avec notre méthode améliorée
+      const headerMap = this._createHeaderMap(headers);
+      
+      console.log("Mappage d'en-têtes Excel détecté:", headerMap);
+      
+      // Convertir la feuille en JSON
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+        header: "A",
+        range: range.s.r // Partir de la ligne d'en-tête
+      });
+      
+      // Supprimer la ligne d'en-tête
+      if (jsonData.length > 0) jsonData.shift();
+      
+      // Normaliser les données en utilisant notre mappage
+      const contacts = jsonData
+        .map((row) => {
+          // Récupérer les valeurs selon notre mappage
+          const fullNameCol = headers[headerMap.name];
+          const roleCol = headers[headerMap.role];
+          const firstNameCol = headers[headerMap.firstName];
+          const lastNameCol = headers[headerMap.lastName];
+          const emailCol = headers[headerMap.email];
+          const departmentCol = headers[headerMap.department];
+          const companyCol = headers[headerMap.company];
+          const phoneCol = headers[headerMap.phone];
+          
+          // Générer le nom complet
+          let fullName = "";
+          if (fullNameCol && row[fullNameCol]) {
+            fullName = row[fullNameCol];
+          } else if (firstNameCol && lastNameCol) {
+            const firstName = row[firstNameCol] || "";
+            const lastName = row[lastNameCol] || "";
+            fullName = `${firstName} ${lastName}`.trim();
+          }
+          
+          // Créer le contact
+          const contact = {
+            fullName,
+            role: (roleCol && row[roleCol]) ? row[roleCol] : "Poste non spécifié",
+            company: (companyCol && row[companyCol]) ? row[companyCol] : "Schneider Electric",
+            email: (emailCol && row[emailCol]) || "",
+            department: (departmentCol && row[departmentCol]) || "",
+            phone: (phoneCol && row[phoneCol]) || "",
+            confidenceScore: 1.0,
+            importedFromExcel: true,
+            sources: []
+          };
+          
+          return contact;
+        })
+        .filter((contact) => {
+          // Filtrer les lignes vides ou invalides
+          return (
+            contact.fullName && (
+              contact.role !== "Poste non spécifié" ||
+              contact.email ||
+              contact.department
+            )
+          );
+        });
+      
+      return contacts;
+      
+    } catch (error) {
+      console.error("Erreur lors de l'importation Excel:", error);
+      throw new Error(`Erreur lors de l'importation Excel: ${error.message}`);
+    }
+  }
+
+  /**
+   * Méthode utilitaire pour lire un fichier comme texte
+   * @param {File} file - Le fichier à lire
+   * @returns {Promise<string>} - Le contenu du fichier
+   */
+  _readFileAsText(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = (e) => reject(new Error("Erreur de lecture du fichier"));
+      reader.readAsText(file);
+    });
+  }
+
+  /**
+   * Méthode utilitaire pour lire un fichier comme ArrayBuffer
+   * @param {File} file - Le fichier à lire
+   * @returns {Promise<ArrayBuffer>} - Le contenu du fichier
+   */
+  _readFileAsArrayBuffer(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = (e) => reject(new Error("Erreur de lecture du fichier"));
+      reader.readAsArrayBuffer(file);
+    });
+  }
+  
   /**
    * Analyse la pertinence des contacts par rapport aux actualités
    * @param {Array} contacts - Les contacts importés
