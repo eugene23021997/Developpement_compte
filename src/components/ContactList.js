@@ -1,9 +1,9 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import LoadingSpinner from "./LoadingSpinner";
 
 /**
- * Composant pour afficher une liste de contacts avec filtres et actions
- * Version améliorée avec un design plus harmonieux et user-friendly
+ * Composant amélioré pour afficher une liste de contacts avec filtres et actions
+ * Modifications: réduction de la largeur de la colonne de sélection et normalisation des rôles
  * @param {Object} props - Propriétés du composant
  * @param {Array} props.contacts - Liste des contacts à afficher
  * @param {boolean} props.isLoadingRss - Indicateur de chargement des flux RSS
@@ -11,11 +11,11 @@ import LoadingSpinner from "./LoadingSpinner";
  * @param {function} props.onContactSelect - Fonction appelée lors de la sélection d'un contact
  * @returns {JSX.Element} Liste de contacts filtrables et exportables
  */
-const ContactList = ({ 
-  contacts, 
-  isLoadingRss, 
+const ContactList = ({
+  contacts,
+  isLoadingRss,
   isImportedList = false,
-  onContactSelect 
+  onContactSelect,
 }) => {
   // États pour le filtrage et la sélection
   const [confidenceFilter, setConfidenceFilter] = useState(0.5);
@@ -23,33 +23,225 @@ const ContactList = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedContacts, setSelectedContacts] = useState([]);
   const [showOnlySelected, setShowOnlySelected] = useState(false);
+  const [normalizedContacts, setNormalizedContacts] = useState([]);
 
-  // Extraction de tous les rôles uniques pour le filtre
-  const uniqueRoles = useMemo(() => {
-    const roles = new Set();
-    contacts.forEach((contact) => {
-      // Extraire le type de poste principal (ex: Directeur, CEO, etc.)
-      const mainRole = contact.role?.split(" ")[0];
-      if (mainRole && mainRole !== "Poste" && mainRole !== "non") {
-        roles.add(mainRole);
-      }
-    });
-    return Array.from(roles).sort();
+  // Liste des rôles standardisés applicables à toutes les entreprises
+  const standardRoles = [
+    "CEO / PDG",
+    "CFO / Directeur Financier",
+    "CIO / DSI",
+    "CTO / Directeur Technique",
+    "CDO / Directeur Digital",
+    "COO / Directeur des Opérations",
+    "CMO / Directeur Marketing",
+    "CHRO / DRH",
+    "CSO / Directeur Sécurité",
+    "Directeur Stratégie",
+    "Directeur Commercial",
+    "Directeur de la Transformation",
+    "Directeur de l'Innovation",
+    "Directeur de la Supply Chain",
+    "Directeur de Production",
+    "Directeur de Projet",
+    "VP / Vice-Président",
+    "Responsable IT",
+    "Responsable Commercial",
+    "Responsable Achats",
+    "Chef de Produit",
+  ];
+
+  // Fonction pour normaliser les rôles des contacts
+  const normalizeRole = (role) => {
+    if (!role) return "Autre";
+
+    const roleLower = role.toLowerCase();
+
+    // Appliquer la normalisation basée sur les mots-clés
+    if (
+      roleLower.includes("pdg") ||
+      roleLower.includes("ceo") ||
+      roleLower.includes("président") ||
+      roleLower.includes("chief executive") ||
+      roleLower.includes("directeur général")
+    ) {
+      return "CEO / PDG";
+    }
+
+    if (
+      roleLower.includes("cfo") ||
+      roleLower.includes("financier") ||
+      roleLower.includes("finance") ||
+      roleLower.includes("chief financial")
+    ) {
+      return "CFO / Directeur Financier";
+    }
+
+    if (
+      roleLower.includes("cio") ||
+      roleLower.includes("dsi") ||
+      roleLower.includes("systèmes d'information") ||
+      roleLower.includes("information technology") ||
+      roleLower.includes("informatique")
+    ) {
+      return "CIO / DSI";
+    }
+
+    if (
+      roleLower.includes("cto") ||
+      roleLower.includes("technique") ||
+      roleLower.includes("technology") ||
+      roleLower.includes("technical")
+    ) {
+      return "CTO / Directeur Technique";
+    }
+
+    if (
+      roleLower.includes("cdo") ||
+      roleLower.includes("digital") ||
+      roleLower.includes("numérique")
+    ) {
+      return "CDO / Directeur Digital";
+    }
+
+    if (
+      roleLower.includes("coo") ||
+      roleLower.includes("opérations") ||
+      roleLower.includes("operations")
+    ) {
+      return "COO / Directeur des Opérations";
+    }
+
+    if (roleLower.includes("cmo") || roleLower.includes("marketing")) {
+      return "CMO / Directeur Marketing";
+    }
+
+    if (
+      roleLower.includes("rh") ||
+      roleLower.includes("ressources humaines") ||
+      roleLower.includes("human resources") ||
+      roleLower.includes("chro") ||
+      roleLower.includes("drh")
+    ) {
+      return "CHRO / DRH";
+    }
+
+    if (
+      roleLower.includes("cso") ||
+      roleLower.includes("sécurité") ||
+      roleLower.includes("security")
+    ) {
+      return "CSO / Directeur Sécurité";
+    }
+
+    if (roleLower.includes("stratégie") || roleLower.includes("strategy")) {
+      return "Directeur Stratégie";
+    }
+
+    if (
+      (roleLower.includes("commercial") ||
+        roleLower.includes("ventes") ||
+        roleLower.includes("sales")) &&
+      (roleLower.includes("directeur") || roleLower.includes("director"))
+    ) {
+      return "Directeur Commercial";
+    }
+
+    if (roleLower.includes("transformation")) {
+      return "Directeur de la Transformation";
+    }
+
+    if (roleLower.includes("innovation")) {
+      return "Directeur de l'Innovation";
+    }
+
+    if (
+      roleLower.includes("supply chain") ||
+      roleLower.includes("chaîne") ||
+      roleLower.includes("logistique")
+    ) {
+      return "Directeur de la Supply Chain";
+    }
+
+    if (
+      roleLower.includes("production") ||
+      roleLower.includes("manufacturing")
+    ) {
+      return "Directeur de Production";
+    }
+
+    if (roleLower.includes("projet") || roleLower.includes("project")) {
+      return "Directeur de Projet";
+    }
+
+    if (roleLower.includes("vice") || roleLower.includes("vp")) {
+      return "VP / Vice-Président";
+    }
+
+    if (
+      (roleLower.includes("it") || roleLower.includes("informatique")) &&
+      (roleLower.includes("responsable") ||
+        roleLower.includes("manager") ||
+        roleLower.includes("chef"))
+    ) {
+      return "Responsable IT";
+    }
+
+    if (
+      (roleLower.includes("commercial") ||
+        roleLower.includes("ventes") ||
+        roleLower.includes("sales")) &&
+      (roleLower.includes("responsable") ||
+        roleLower.includes("manager") ||
+        roleLower.includes("chef"))
+    ) {
+      return "Responsable Commercial";
+    }
+
+    if (
+      roleLower.includes("achat") ||
+      roleLower.includes("procurement") ||
+      roleLower.includes("purchasing")
+    ) {
+      return "Responsable Achats";
+    }
+
+    if (roleLower.includes("produit") || roleLower.includes("product")) {
+      return "Chef de Produit";
+    }
+
+    // Si aucune correspondance n'est trouvée
+    return "Autre";
+  };
+
+  // Normaliser les contacts
+  useEffect(() => {
+    const normalized = contacts.map((contact) => ({
+      ...contact,
+      normalizedRole: normalizeRole(contact.role),
+    }));
+    setNormalizedContacts(normalized);
   }, [contacts]);
+
+  // Extraction des rôles réellement présents dans les données pour le filtre
+  const uniqueRoles = useMemo(() => {
+    const rolesInData = new Set(
+      normalizedContacts.map((contact) => contact.normalizedRole)
+    );
+
+    // Filtrer les rôles standards qui sont présents dans les données
+    return standardRoles.filter((role) => rolesInData.has(role));
+  }, [normalizedContacts]);
 
   // Filtrage des contacts
   const filteredContacts = useMemo(() => {
-    return contacts.filter((contact) => {
+    return normalizedContacts.filter((contact) => {
       // Filtre par score de confiance
       if (contact.confidenceScore < confidenceFilter) {
         return false;
       }
 
       // Filtre par rôle
-      if (
-        roleFilter !== "all" &&
-        !contact.role?.toLowerCase().includes(roleFilter.toLowerCase())
-      ) {
+      if (roleFilter !== "all" && contact.normalizedRole !== roleFilter) {
         return false;
       }
 
@@ -63,7 +255,8 @@ const ContactList = ({
         (contact.role && contact.role.toLowerCase().includes(searchText)) ||
         (contact.department &&
           contact.department.toLowerCase().includes(searchText)) ||
-        (contact.company && contact.company.toLowerCase().includes(searchText)) ||
+        (contact.company &&
+          contact.company.toLowerCase().includes(searchText)) ||
         (contact.email && contact.email.toLowerCase().includes(searchText));
 
       // Filtre "sélectionnés uniquement"
@@ -77,7 +270,7 @@ const ContactList = ({
       return matchesSearch;
     });
   }, [
-    contacts,
+    normalizedContacts,
     confidenceFilter,
     roleFilter,
     searchTerm,
@@ -94,10 +287,10 @@ const ContactList = ({
       );
     } else {
       setSelectedContacts([...selectedContacts, name]);
-      
+
       // Notifier le parent si la fonction est fournie
       if (onContactSelect) {
-        const contact = contacts.find(c => (c.name || c.fullName) === name);
+        const contact = contacts.find((c) => (c.name || c.fullName) === name);
         if (contact) {
           onContactSelect(contact);
         }
@@ -119,16 +312,16 @@ const ContactList = ({
   // Générer un lien LinkedIn à partir du nom
   const generateLinkedInSearchUrl = (name) => {
     if (!name) return null;
-    
+
     // Pour les contacts importés, on utilise la recherche LinkedIn
     const encodedName = encodeURIComponent(name);
     const searchUrl = `https://www.linkedin.com/search/results/people/?keywords=${encodedName}`;
-    
+
     // Si le nom inclut Schneider Electric, on affine la recherche
     if (name.toLowerCase().includes("schneider")) {
       return `${searchUrl}&company=Schneider%20Electric`;
     }
-    
+
     return searchUrl;
   };
 
@@ -137,7 +330,9 @@ const ContactList = ({
     if (!source || !source.title) {
       return "Actualité sans titre";
     }
-    return source.title.length > 50 ? source.title.substring(0, 47) + '...' : source.title;
+    return source.title.length > 50
+      ? source.title.substring(0, 47) + "..."
+      : source.title;
   };
 
   // Export des contacts sélectionnés
@@ -275,6 +470,9 @@ const ContactList = ({
                   {role}
                 </option>
               ))}
+              {normalizedContacts.some((c) => c.normalizedRole === "Autre") && (
+                <option value="Autre">Autre</option>
+              )}
             </select>
           </div>
 
@@ -350,7 +548,7 @@ const ContactList = ({
           <table className="premium-contacts-table">
             <thead>
               <tr>
-                <th className="select-column">
+                <th className="select-column" style={{ width: "32px" }}>
                   <input
                     type="checkbox"
                     checked={
@@ -361,7 +559,10 @@ const ContactList = ({
                     id="selectAll"
                     className="premium-checkbox"
                   />
-                  <label htmlFor="selectAll" className="premium-checkbox-label visually-hidden">
+                  <label
+                    htmlFor="selectAll"
+                    className="premium-checkbox-label visually-hidden"
+                  >
                     Tout sélectionner
                   </label>
                 </th>
@@ -373,11 +574,22 @@ const ContactList = ({
             </thead>
             <tbody>
               {filteredContacts.map((contact, index) => (
-                <tr 
+                <tr
                   key={`${contact.name || contact.fullName}-${index}`}
-                  className={selectedContacts.includes(contact.name || contact.fullName) ? "selected-row" : ""}
+                  className={
+                    selectedContacts.includes(contact.name || contact.fullName)
+                      ? "selected-row"
+                      : ""
+                  }
                 >
-                  <td className="select-column">
+                  <td
+                    className="select-column"
+                    style={{
+                      width: "32px",
+                      paddingLeft: "4px",
+                      paddingRight: "4px",
+                    }}
+                  >
                     <input
                       type="checkbox"
                       checked={selectedContacts.includes(
@@ -396,19 +608,21 @@ const ContactList = ({
                   </td>
                   <td className="name-column">
                     {/* Ajouter un lien LinkedIn */}
-                    <a 
-                      href={generateLinkedInSearchUrl(contact.fullName || contact.name)} 
+                    <a
+                      href={generateLinkedInSearchUrl(
+                        contact.fullName || contact.name
+                      )}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="linkedin-link"
                       title="Rechercher sur LinkedIn"
                     >
                       {contact.fullName || contact.name}
-                      <svg 
-                        className="linkedin-icon" 
-                        width="14" 
-                        height="14" 
-                        viewBox="0 0 24 24" 
+                      <svg
+                        className="linkedin-icon"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
                         fill="none"
                         xmlns="http://www.w3.org/2000/svg"
                       >
@@ -447,16 +661,28 @@ const ContactList = ({
                         Rôle non spécifié
                       </span>
                     ) : (
-                      contact.role
+                      <>
+                        <div className="role-main">
+                          {contact.normalizedRole}
+                        </div>
+                        {contact.normalizedRole !== contact.role && (
+                          <div className="role-original">{contact.role}</div>
+                        )}
+                      </>
                     )}
                   </td>
                   <td className="email-column">
                     {contact.email ? (
-                      <a href={`mailto:${contact.email}`} className="contact-email-link">
+                      <a
+                        href={`mailto:${contact.email}`}
+                        className="contact-email-link"
+                      >
                         {contact.email}
                       </a>
                     ) : (
-                      <span className="premium-contact-empty">Email non disponible</span>
+                      <span className="premium-contact-empty">
+                        Email non disponible
+                      </span>
                     )}
                   </td>
                   {!isImportedList && (
@@ -464,47 +690,50 @@ const ContactList = ({
                       {contact.sources && contact.sources.length > 0 ? (
                         <div className="source-info">
                           {contact.sources[0].link ? (
-                            <a 
-                              href={contact.sources[0].link} 
-                              target="_blank" 
+                            <a
+                              href={contact.sources[0].link}
+                              target="_blank"
                               rel="noopener noreferrer"
                               className="source-link"
                               title={contact.sources[0].title}
                             >
                               {formatSource(contact.sources[0])}
-                              <svg 
-                                className="external-link-icon" 
-                                width="10" 
-                                height="10" 
-                                viewBox="0 0 24 24" 
-                                fill="none" 
+                              <svg
+                                className="external-link-icon"
+                                width="10"
+                                height="10"
+                                viewBox="0 0 24 24"
+                                fill="none"
                                 xmlns="http://www.w3.org/2000/svg"
                               >
-                                <path 
-                                  d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" 
-                                  stroke="currentColor" 
-                                  strokeWidth="2" 
-                                  strokeLinecap="round" 
+                                <path
+                                  d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
                                   strokeLinejoin="round"
                                 />
-                                <path 
-                                  d="M15 3h6v6" 
-                                  stroke="currentColor" 
-                                  strokeWidth="2" 
-                                  strokeLinecap="round" 
+                                <path
+                                  d="M15 3h6v6"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
                                   strokeLinejoin="round"
                                 />
-                                <path 
-                                  d="M10 14L21 3" 
-                                  stroke="currentColor" 
-                                  strokeWidth="2" 
-                                  strokeLinecap="round" 
+                                <path
+                                  d="M10 14L21 3"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
                                   strokeLinejoin="round"
                                 />
                               </svg>
                             </a>
                           ) : (
-                            <span className="source-title" title={contact.sources[0].title}>
+                            <span
+                              className="source-title"
+                              title={contact.sources[0].title}
+                            >
                               {formatSource(contact.sources[0])}
                             </span>
                           )}
@@ -515,7 +744,9 @@ const ContactList = ({
                           )}
                         </div>
                       ) : (
-                        <span className="premium-contact-empty">Source non disponible</span>
+                        <span className="premium-contact-empty">
+                          Source non disponible
+                        </span>
                       )}
                     </td>
                   )}
@@ -586,8 +817,17 @@ const ContactList = ({
         </div>
       )}
 
-      {/* Style amélioré pour le tableau de contacts */}
+      {/* Styles spécifiques */}
       <style jsx>{`
+        .select-column {
+          width: 32px !important;
+          min-width: 32px !important;
+          max-width: 32px !important;
+          padding-left: 4px !important;
+          padding-right: 4px !important;
+          text-align: center !important;
+        }
+
         .premium-contacts-table-wrapper {
           border-radius: 12px;
           overflow: hidden;
@@ -595,13 +835,13 @@ const ContactList = ({
           background: var(--surface);
           margin-bottom: 24px;
         }
-        
+
         .premium-contacts-table {
           width: 100%;
           border-collapse: collapse;
           font-size: 14px;
         }
-        
+
         .premium-contacts-table th {
           background-color: var(--glass-bg);
           color: var(--text-secondary);
@@ -613,43 +853,35 @@ const ContactList = ({
           z-index: 10;
           border-bottom: 1px solid var(--divider);
         }
-        
+
         .premium-contacts-table td {
           padding: 12px 16px;
           border-bottom: 1px solid var(--divider);
           vertical-align: middle;
         }
-        
+
         .premium-contacts-table tbody tr {
           transition: background-color 0.15s ease;
         }
-        
+
         .premium-contacts-table tbody tr:hover {
           background-color: rgba(0, 113, 243, 0.04);
         }
-        
+
         .premium-contacts-table tbody tr.selected-row {
           background-color: rgba(0, 113, 243, 0.08);
         }
-        
+
         .premium-contacts-table tbody tr.selected-row:hover {
           background-color: rgba(0, 113, 243, 0.12);
         }
-        
-        /* Nouvelle colonne de sélection plus compacte */
-        .select-column {
-          width: 32px;
-          text-align: center;
-          padding-left: 8px !important;
-          padding-right: 8px !important;
-        }
-        
+
         .name-column {
           width: 18%;
           min-width: 160px;
           font-weight: 500;
         }
-        
+
         /* Style pour le lien LinkedIn */
         .linkedin-link {
           display: inline-flex;
@@ -660,63 +892,75 @@ const ContactList = ({
           position: relative;
           transition: color 0.2s ease;
         }
-        
+
         .linkedin-link:hover {
           color: var(--primary);
         }
-        
+
         .linkedin-icon {
           opacity: 0.3;
           transition: opacity 0.2s ease;
         }
-        
+
         .linkedin-link:hover .linkedin-icon {
           opacity: 0.8;
         }
-        
+
         .role-column {
           width: 30%;
         }
-        
+
+        .role-main {
+          font-weight: 500;
+          color: var(--text-primary);
+        }
+
+        .role-original {
+          font-size: 12px;
+          color: var(--text-tertiary);
+          margin-top: 2px;
+        }
+
         .email-column {
           width: 22%;
           min-width: 180px;
         }
-        
+
         .source-column {
           width: 30%;
         }
-        
+
         .contact-email-link {
           color: var(--primary);
           text-decoration: none;
           transition: color 0.15s ease;
-          font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+          font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo,
+            monospace;
           font-size: 13px;
         }
-        
+
         .contact-email-link:hover {
           color: var(--primary-hover);
           text-decoration: underline;
         }
-        
+
         .premium-contact-unknown-role {
           color: var(--text-tertiary);
           font-style: italic;
         }
-        
+
         .premium-contact-empty {
           color: var(--text-tertiary);
           font-style: italic;
           font-size: 13px;
         }
-        
+
         .source-info {
           display: flex;
           flex-direction: column;
           gap: 2px;
         }
-        
+
         .source-title {
           font-size: 13px;
           color: var(--text-primary);
@@ -725,7 +969,7 @@ const ContactList = ({
           text-overflow: ellipsis;
           max-width: 250px;
         }
-        
+
         .source-link {
           font-size: 13px;
           color: var(--primary);
@@ -739,21 +983,21 @@ const ContactList = ({
           gap: 4px;
           transition: color 0.15s ease;
         }
-        
+
         .source-link:hover {
           color: var(--primary-hover);
           text-decoration: underline;
         }
-        
+
         .external-link-icon {
           opacity: 0.7;
           transition: opacity 0.15s ease;
         }
-        
+
         .source-link:hover .external-link-icon {
           opacity: 1;
         }
-        
+
         .source-count {
           font-size: 12px;
           color: var(--text-tertiary);
@@ -764,51 +1008,51 @@ const ContactList = ({
           .source-column {
             display: none;
           }
-          
+
           .name-column {
             width: 25%;
           }
-          
+
           .role-column {
             width: 45%;
           }
         }
-        
+
         @media (max-width: 992px) {
           .email-column {
             display: none;
           }
-          
+
           .name-column {
             width: 30%;
           }
-          
+
           .role-column {
             width: 70%;
           }
         }
-        
+
         @media (max-width: 768px) {
           .premium-contacts-table th,
           .premium-contacts-table td {
             padding: 12px 8px;
           }
-          
+
           .name-column {
             min-width: 120px;
           }
         }
-        
+
         @media (max-width: 576px) {
           .premium-contacts-table-wrapper {
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
           }
-          
+
           .premium-contacts-table {
             font-size: 13px;
           }
-          
+
           .role-column {
             max-width: 200px;
             white-space: nowrap;
